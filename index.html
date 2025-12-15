@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Control de Cargas vs Transferencias</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body class="bg-zinc-900 text-zinc-100 min-h-screen p-6">
+
+<div class="max-w-7xl mx-auto space-y-6">
+  <h1 class="text-2xl font-bold">🎰 Control 1 a 1 – Cargas vs Transferencias</h1>
+
+  <!-- ================== INPUTS ================== -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+    <!-- ================== CARGAS ================== -->
+    <div class="panel space-y-2">
+
+      <div class="flex justify-between items-center">
+        <h2 class="title">Cargas realizadas (fuente)</h2>
+      </div>
+
+      <textarea
+        id="cargasInput"
+        placeholder="2025-12-11 17:22:06	usuario	Carga	29.000,00"
+      ></textarea>
+
+      <input
+        id="cargasFilter"
+        class="filter"
+        placeholder="Filtrar monto (ej: 2000, 2.000, 2.000,00)"
+      >
+
+      <!-- RESULTADO FILTRADO -->
+      <div class="flex justify-between items-center mt-2">
+        <span class="hint">Resultado filtrado</span>
+        <span id="cargasCount" class="hint">Cargas filtradas: 0</span>
+      </div>
+
+      <textarea
+        id="cargasFiltradas"
+        class="bg-zinc-950"
+        placeholder="Las cargas filtradas aparecerán aquí"
+        readonly
+      ></textarea>
+
+    </div>
+
+    <!-- ================== TRANSFERENCIAS ================== -->
+    <div class="panel space-y-2">
+
+      <div class="flex justify-between items-center">
+        <h2 class="title">Transferencias recibidas (fuente)</h2>
+        <span id="transferenciasPreview" class="hint">
+          Transferencias importadas: 0
+        </span>
+      </div>
+
+      <textarea
+        id="transferenciasInput"
+        placeholder="Se cargan automáticamente desde XLSX"
+        readonly
+      ></textarea>
+
+      <input
+        id="transferenciasFilter"
+        class="filter"
+        placeholder="Filtrar monto (ej: 2000, 2.000, 2.000,00)"
+      >
+
+      <input
+        type="file"
+        id="xlsxInput"
+        accept=".xlsx"
+        class="mt-1 text-sm"
+      >
+
+      <!-- RESULTADO FILTRADO -->
+      <div class="flex justify-between items-center mt-2">
+        <span class="hint">Resultado filtrado</span>
+        <span id="transferenciasCount" class="hint">
+          Transferencias filtradas: 0
+        </span>
+      </div>
+
+      <textarea
+        id="transferenciasFiltradas"
+        class="bg-zinc-950"
+        placeholder="Las transferencias filtradas aparecerán aquí"
+        readonly
+      ></textarea>
+
+    </div>
+
+  </div>
+
+  <!-- ================== COMPARAR ================== -->
+  <button id="compararBtn" class="btn">
+    Comparar
+  </button>
+
+  <button id="openSalientesBtn" class="btn bg-indigo-600 hover:bg-indigo-500">
+  Buscar transferencias salientes
+</button>
+
+
+  <!-- ================== RESULTADOS ================== -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+    <div class="panel">
+      <h3 class="ok">✔ Coincidencias</h3>
+      <ul id="okList" class="space-y-1"></ul>
+    </div>
+
+    <div class="panel">
+      <h3 class="bonus">🎁 Bonificaciones</h3>
+      <ul id="bonusList" class="space-y-1"></ul>
+    </div>
+
+    <div class="panel">
+      <h3 class="error">⚠ Diferencias</h3>
+      <ul id="errorList" class="space-y-1"></ul>
+    </div>
+
+  </div>
+
+</div>
+<!-- MODAL TRANSFERENCIAS SALIENTES -->
+<div id="salientesModal"
+     class="fixed inset-0 bg-black/70 hidden items-center justify-center z-50">
+
+  <div class="bg-zinc-900 w-full max-w-3xl rounded-xl p-6 space-y-4">
+
+    <div class="flex justify-between items-center">
+      <h2 class="text-xl font-bold">📤 Transferencias salientes</h2>
+      <button id="closeSalientesBtn"
+        class="text-zinc-400 hover:text-white">✕</button>
+    </div>
+
+    <!-- IMPORTAR XLSX -->
+    <input
+      type="file"
+      id="xlsxSalientesInput"
+      accept=".xlsx"
+      class="text-sm"
+    >
+
+    <!-- FILTRO POR MONTO -->
+    <input
+      id="salientesFilter"
+      class="filter"
+      placeholder="Filtrar monto (ej: 10000, 10.000, 10.000,00)"
+    >
+
+    <!-- RESULTADO -->
+    <textarea
+      id="salientesOutput"
+      class="w-full h-64 bg-zinc-950 rounded p-3 text-sm"
+      placeholder="Aquí se mostrarán las transferencias salientes"
+      readonly
+    ></textarea>
+
+    <!-- CONTADOR + TOTAL -->
+    <div id="salientesCount" class="text-sm text-zinc-400">
+      Transferencias: 0 — Total: $0,00
+    </div>
+
+  </div>
+</div>
+
+
+
+<script src="script.js"></script>
+</body>
+</html>
+
+
+
