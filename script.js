@@ -195,6 +195,7 @@ compararBtn.addEventListener('click', () => {
  **********************/
 const CBU_EXCLUIDO = '0000267900000001162558';
 
+const salientesFilter = document.getElementById('salientesFilter');
 openSalientesBtn.addEventListener('click', () => {
   salientesModal.classList.remove('hidden');
   salientesModal.classList.add('flex');
