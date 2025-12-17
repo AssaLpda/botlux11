@@ -25,16 +25,17 @@ function extraerMontoLinea(linea) {
   return m ? m[0] : null;
 }
 
-function contar(texto) {
-  if (!texto || !texto.trim()) return 0;
-  return texto.split('\n').filter(l => l.trim()).length;
+/* 🔹 Convierte una línea a monto numérico en centavos */
+function montoLineaACentavos(linea) {
+  const m = extraerMontoLinea(linea);
+  if (!m) return null;
+  return Number(limpiarMonto(m));
 }
 
 function sumarMontos(lineas) {
   return lineas.reduce((acc, l) => {
-    const m = extraerMontoLinea(l);
-    if (!m) return acc;
-    return acc + Number(limpiarMonto(m));
+    const v = montoLineaACentavos(l);
+    return v ? acc + v : acc;
   }, 0) / 100;
 }
 
@@ -68,23 +69,24 @@ xlsxInput.addEventListener('change', e => {
       `Transferencias importadas: ${transferenciasSource.length}`;
 
     transferenciasFiltradas.value = '';
-    transferenciasCount.innerText = '';
+    transferenciasCount.innerText = 'Transferencias filtradas: 0';
   };
 
   reader.readAsBinaryString(file);
 });
 
 /**********************
- * FILTRAR GENERICO
+ * FILTRO POR MONTO EXACTO
  **********************/
-function filtrar(source, filtro) {
-  const buscado = limpiarMonto(filtro.value);
+function filtrarPorMontoExacto(source, filtroInput) {
+  const buscado = limpiarMonto(filtroInput.value);
   if (!buscado) return [];
 
+  const buscadoCentavos = Number(buscado) * 100;
+
   return source.filter(l => {
-    const m = extraerMontoLinea(l);
-    if (!m) return false;
-    return limpiarMonto(m).startsWith(buscado);
+    const v = montoLineaACentavos(l);
+    return v === buscadoCentavos;
   });
 }
 
@@ -92,8 +94,14 @@ function filtrar(source, filtro) {
  * FILTRO CARGAS
  **********************/
 cargasFilter.addEventListener('input', () => {
+  if (!cargasFilter.value) {
+    cargasFiltradas.value = '';
+    cargasCount.innerText = 'Cargas filtradas: 0';
+    return;
+  }
+
   const base = cargasSource.split('\n');
-  const resultado = filtrar(base, cargasFilter);
+  const resultado = filtrarPorMontoExacto(base, cargasFilter);
 
   cargasFiltradas.value = resultado.join('\n');
   cargasCount.innerText = `Cargas filtradas: ${resultado.length}`;
@@ -103,7 +111,16 @@ cargasFilter.addEventListener('input', () => {
  * FILTRO TRANSFERENCIAS
  **********************/
 transferenciasFilter.addEventListener('input', () => {
-  const resultado = filtrar(transferenciasSource, transferenciasFilter);
+  if (!transferenciasFilter.value) {
+    transferenciasFiltradas.value = '';
+    transferenciasCount.innerText = 'Transferencias filtradas: 0';
+    return;
+  }
+
+  const resultado = filtrarPorMontoExacto(
+    transferenciasSource,
+    transferenciasFilter
+  );
 
   transferenciasFiltradas.value = resultado.join('\n');
   transferenciasCount.innerText =
@@ -111,10 +128,11 @@ transferenciasFilter.addEventListener('input', () => {
 });
 
 /**********************
- * COMPARAR
+ * COMPARAR (USA FUENTE COMPLETA)
  **********************/
 compararBtn.addEventListener('click', () => {
   okList.innerHTML = '';
+  bonusList.innerHTML = '';
   errorList.innerHTML = '';
 
   const cargas = cargasSource
@@ -147,7 +165,7 @@ compararBtn.addEventListener('click', () => {
 
   Object.entries(agrupadas).forEach(([monto, d]) => {
     if (d.bono > 0) {
-      okList.innerHTML += `
+      bonusList.innerHTML += `
         <li class="text-yellow-400">
           🎁 ${d.bono} bonificación(es) de ${monto}
         </li>`;
@@ -223,10 +241,9 @@ salientesFilter.addEventListener('input', () => {
 
   const base = !buscado
     ? salientesSource
-    : salientesSource.filter(l => {
-        const m = extraerMontoLinea(l);
-        return m && limpiarMonto(m).startsWith(buscado);
-      });
+    : salientesSource.filter(l =>
+        montoLineaACentavos(l) === Number(buscado) * 100
+      );
 
   salientesOutput.value = base.join('\n');
   const total = sumarMontos(base);
