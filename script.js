@@ -193,7 +193,7 @@ compararBtn.addEventListener('click', () => {
 /**********************
  * TRANSFERENCIAS SALIENTES (MODAL)
  **********************/
-const CBU_EXCLUIDO = '0000267900000001162558';
+const CBU_EXCLUIDO = '000002334322884432';
 
 const salientesFilter = document.getElementById('salientesFilter');
 openSalientesBtn.addEventListener('click', () => {
@@ -252,6 +252,7 @@ salientesFilter.addEventListener('input', () => {
   salientesCount.innerText =
     `Transferencias: ${base.length} — Total: ${normalizarMonto(total)}`;
 });
+
 
 
 
