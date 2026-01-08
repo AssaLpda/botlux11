@@ -25,7 +25,6 @@ function extraerMontoLinea(linea) {
   return m ? m[0] : null;
 }
 
-/* 🔹 Convierte una línea a monto numérico en centavos */
 function montoLineaACentavos(linea) {
   const m = extraerMontoLinea(linea);
   if (!m) return null;
@@ -47,7 +46,7 @@ cargasInput.addEventListener('input', () => {
 });
 
 /**********************
- * IMPORTAR XLSX (ENTRANTES)
+ * IMPORTAR XLSX (TRANSFERENCIAS ENTRANTES)
  **********************/
 xlsxInput.addEventListener('change', e => {
   const file = e.target.files[0];
@@ -60,11 +59,15 @@ xlsxInput.addEventListener('change', e => {
 
     transferenciasSource = rows
       .filter(r => r[3] === 'Transferencia entrante' && Number(r[5]) > 0)
-      .map(r =>
-        `${r[0]}\tTransferencia\t${normalizarMonto(r[5])}`
-      );
+      .map(r => ({
+        raw: `${r[0]}\tTransferencia\t${normalizarMonto(r[5])}`,
+        fecha: new Date(r[0]),
+        montoCentavos: Number(r[5]) * 100
+      }));
 
-    transferenciasInput.value = transferenciasSource.join('\n');
+    transferenciasInput.value =
+      transferenciasSource.map(t => t.raw).join('\n');
+
     transferenciasPreview.innerText =
       `Transferencias importadas: ${transferenciasSource.length}`;
 
@@ -76,22 +79,46 @@ xlsxInput.addEventListener('change', e => {
 });
 
 /**********************
- * FILTRO POR MONTO EXACTO
+ * FILTRO TRANSFERENCIAS (MONTO + FECHA/HORA)
  **********************/
-function filtrarPorMontoExacto(source, filtroInput) {
-  const buscado = limpiarMonto(filtroInput.value);
-  if (!buscado) return [];
+const fechaDesde = document.getElementById('fechaDesde');
+const fechaHasta = document.getElementById('fechaHasta');
 
-  const buscadoCentavos = Number(buscado) * 100;
+function filtrarTransferencias() {
+  let resultado = [...transferenciasSource];
 
-  return source.filter(l => {
-    const v = montoLineaACentavos(l);
-    return v === buscadoCentavos;
-  });
+  // MONTO
+  const montoBuscado = limpiarMonto(transferenciasFilter.value);
+  if (montoBuscado) {
+    const centavos = Number(montoBuscado) * 100;
+    resultado = resultado.filter(t => t.montoCentavos === centavos);
+  }
+
+  // FECHA DESDE
+  if (fechaDesde.value) {
+    const desde = new Date(fechaDesde.value);
+    resultado = resultado.filter(t => t.fecha >= desde);
+  }
+
+  // FECHA HASTA
+  if (fechaHasta.value) {
+    const hasta = new Date(fechaHasta.value);
+    resultado = resultado.filter(t => t.fecha <= hasta);
+  }
+
+  transferenciasFiltradas.value =
+    resultado.map(t => t.raw).join('\n');
+
+  transferenciasCount.innerText =
+    `Transferencias filtradas: ${resultado.length}`;
 }
 
+transferenciasFilter.addEventListener('input', filtrarTransferencias);
+fechaDesde.addEventListener('change', filtrarTransferencias);
+fechaHasta.addEventListener('change', filtrarTransferencias);
+
 /**********************
- * FILTRO CARGAS
+ * FILTRO CARGAS (MONTO)
  **********************/
 cargasFilter.addEventListener('input', () => {
   if (!cargasFilter.value) {
@@ -101,34 +128,19 @@ cargasFilter.addEventListener('input', () => {
   }
 
   const base = cargasSource.split('\n');
-  const resultado = filtrarPorMontoExacto(base, cargasFilter);
+  const buscado = limpiarMonto(cargasFilter.value);
+  const buscadoCentavos = Number(buscado) * 100;
+
+  const resultado = base.filter(l =>
+    montoLineaACentavos(l) === buscadoCentavos
+  );
 
   cargasFiltradas.value = resultado.join('\n');
   cargasCount.innerText = `Cargas filtradas: ${resultado.length}`;
 });
 
 /**********************
- * FILTRO TRANSFERENCIAS
- **********************/
-transferenciasFilter.addEventListener('input', () => {
-  if (!transferenciasFilter.value) {
-    transferenciasFiltradas.value = '';
-    transferenciasCount.innerText = 'Transferencias filtradas: 0';
-    return;
-  }
-
-  const resultado = filtrarPorMontoExacto(
-    transferenciasSource,
-    transferenciasFilter
-  );
-
-  transferenciasFiltradas.value = resultado.join('\n');
-  transferenciasCount.innerText =
-    `Transferencias filtradas: ${resultado.length}`;
-});
-
-/**********************
- * COMPARAR (USA FUENTE COMPLETA)
+ * COMPARAR
  **********************/
 compararBtn.addEventListener('click', () => {
   okList.innerHTML = '';
@@ -154,8 +166,8 @@ compararBtn.addEventListener('click', () => {
     else agrupadas[c.monto].carga++;
   });
 
-  transferenciasSource.forEach(l => {
-    const m = extraerMontoLinea(l);
+  transferenciasSource.forEach(t => {
+    const m = extraerMontoLinea(t.raw);
     if (!m) return;
     if (!agrupadas[m]) {
       agrupadas[m] = { carga: 0, bono: 0, trans: 0 };
@@ -194,8 +206,8 @@ compararBtn.addEventListener('click', () => {
  * TRANSFERENCIAS SALIENTES (MODAL)
  **********************/
 const CBU_EXCLUIDO = '000002334322884432';
-
 const salientesFilter = document.getElementById('salientesFilter');
+
 openSalientesBtn.addEventListener('click', () => {
   salientesModal.classList.remove('hidden');
   salientesModal.classList.add('flex');
@@ -252,6 +264,7 @@ salientesFilter.addEventListener('input', () => {
   salientesCount.innerText =
     `Transferencias: ${base.length} — Total: ${normalizarMonto(total)}`;
 });
+
 
 
 
