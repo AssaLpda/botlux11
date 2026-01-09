@@ -4,6 +4,8 @@
 let cargasSource = '';
 let transferenciasSource = [];
 let transferenciasSourceOriginal = [];
+
+let salientesSourceOriginal = [];
 let salientesSource = [];
 
 /**********************
@@ -67,7 +69,6 @@ xlsxInput.addEventListener('change', e => {
       }));
 
     transferenciasSource = [...transferenciasSourceOriginal];
-
     renderTransferenciasFuente();
   };
 
@@ -126,17 +127,14 @@ fechaHasta.addEventListener('change', filtrarTransferencias);
  **********************/
 resetTransferenciasBtn.addEventListener('click', () => {
   transferenciasSource = [...transferenciasSourceOriginal];
-
-  // limpiar filtros visuales
   transferenciasFilter.value = '';
   fechaDesde.value = '';
   fechaHasta.value = '';
-
   renderTransferenciasFuente();
 });
 
 /**********************
- * FILTRO CARGAS (MONTO)
+ * FILTRO CARGAS
  **********************/
 cargasFilter.addEventListener('input', () => {
   if (!cargasFilter.value) {
@@ -146,8 +144,7 @@ cargasFilter.addEventListener('input', () => {
   }
 
   const base = cargasSource.split('\n');
-  const buscado = limpiarMonto(cargasFilter.value);
-  const buscadoCentavos = Number(buscado) * 100;
+  const buscadoCentavos = Number(limpiarMonto(cargasFilter.value)) * 100;
 
   const resultado = base.filter(l =>
     montoLineaACentavos(l) === buscadoCentavos
@@ -195,27 +192,15 @@ compararBtn.addEventListener('click', () => {
 
   Object.entries(agrupadas).forEach(([monto, d]) => {
     if (d.bono > 0) {
-      bonusList.innerHTML += `
-        <li class="text-yellow-400">
-          🎁 ${d.bono} bonificación(es) de ${monto}
-        </li>`;
+      bonusList.innerHTML += `<li class="text-yellow-400">🎁 ${d.bono} bonificación(es) de ${monto}</li>`;
     }
 
     if (d.carga === d.trans) {
-      okList.innerHTML += `
-        <li class="text-emerald-400">
-          ✔ ${d.carga} carga(s) OK de ${monto}
-        </li>`;
+      okList.innerHTML += `<li class="text-emerald-400">✔ ${d.carga} carga(s) OK de ${monto}</li>`;
     } else if (d.carga > d.trans) {
-      errorList.innerHTML += `
-        <li class="text-red-400">
-          ❌ Faltan ${d.carga - d.trans} transferencia(s) de ${monto}
-        </li>`;
+      errorList.innerHTML += `<li class="text-red-400">❌ Faltan ${d.carga - d.trans} transferencia(s) de ${monto}</li>`;
     } else {
-      errorList.innerHTML += `
-        <li class="text-red-400">
-          ⚠ Sobran ${d.trans - d.carga} transferencia(s) de ${monto}
-        </li>`;
+      errorList.innerHTML += `<li class="text-red-400">⚠ Sobran ${d.trans - d.carga} transferencia(s) de ${monto}</li>`;
     }
   });
 });
@@ -224,7 +209,10 @@ compararBtn.addEventListener('click', () => {
  * TRANSFERENCIAS SALIENTES (MODAL)
  **********************/
 const CBU_EXCLUIDO = '000002334322884432';
+
 const salientesFilter = document.getElementById('salientesFilter');
+const salientesDesde = document.getElementById('salientesDesde');
+const salientesHasta = document.getElementById('salientesHasta');
 
 openSalientesBtn.addEventListener('click', () => {
   salientesModal.classList.remove('hidden');
@@ -236,7 +224,9 @@ closeSalientesBtn.addEventListener('click', () => {
   salientesModal.classList.remove('flex');
 });
 
-/* IMPORTAR SALIENTES */
+/**********************
+ * IMPORTAR SALIENTES
+ **********************/
 xlsxSalientesInput.addEventListener('change', e => {
   const file = e.target.files[0];
   const reader = new FileReader();
@@ -246,39 +236,68 @@ xlsxSalientesInput.addEventListener('change', e => {
     const sheet = wb.Sheets[wb.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
-    salientesSource = rows
+    salientesSourceOriginal = rows
       .filter(r =>
         r[3] === 'Transferencia saliente' &&
         Number(r[4]) > 0 &&
         !String(r[2] || '').includes(CBU_EXCLUIDO)
       )
-      .map(r =>
-        `${r[0]}\t${r[2]}\t${normalizarMonto(r[4])}`
-      );
+      .map(r => ({
+        raw: `${r[0]}\t${r[2]}\t${normalizarMonto(r[4])}`,
+        fecha: new Date(r[0]),
+        montoCentavos: Number(r[4]) * 100
+      }));
 
-    salientesOutput.value = salientesSource.join('\n');
-    const total = sumarMontos(salientesSource);
-
-    salientesCount.innerText =
-      `Transferencias: ${salientesSource.length} — Total: ${normalizarMonto(total)}`;
+    salientesSource = [...salientesSourceOriginal];
+    renderSalientes();
   };
 
   reader.readAsBinaryString(file);
 });
 
-/* FILTRO SALIENTES */
-salientesFilter.addEventListener('input', () => {
-  const buscado = limpiarMonto(salientesFilter.value);
+/**********************
+ * RENDER SALIENTES
+ **********************/
+function renderSalientes() {
+  salientesOutput.value =
+    salientesSource.map(s => s.raw).join('\n');
 
-  const base = !buscado
-    ? salientesSource
-    : salientesSource.filter(l =>
-        montoLineaACentavos(l) === Number(buscado) * 100
-      );
-
-  salientesOutput.value = base.join('\n');
-  const total = sumarMontos(base);
+  const total = salientesSource.reduce(
+    (acc, s) => acc + s.montoCentavos,
+    0
+  ) / 100;
 
   salientesCount.innerText =
-    `Transferencias: ${base.length} — Total: ${normalizarMonto(total)}`;
-});
+    `Transferencias: ${salientesSource.length} — Total: ${normalizarMonto(total)}`;
+}
+
+/**********************
+ * FILTRO SALIENTES (MONTO + FECHA/HORA)
+ **********************/
+function filtrarSalientes() {
+  let resultado = [...salientesSourceOriginal];
+
+  const buscado = limpiarMonto(salientesFilter.value);
+  if (buscado) {
+    const centavos = Number(buscado) * 100;
+    resultado = resultado.filter(s => s.montoCentavos === centavos);
+  }
+
+  if (salientesDesde.value) {
+    const desde = new Date(salientesDesde.value);
+    resultado = resultado.filter(s => s.fecha >= desde);
+  }
+
+  if (salientesHasta.value) {
+    const hasta = new Date(salientesHasta.value);
+    resultado = resultado.filter(s => s.fecha <= hasta);
+  }
+
+  salientesSource = resultado;
+  renderSalientes();
+}
+
+salientesFilter.addEventListener('input', filtrarSalientes);
+salientesDesde.addEventListener('change', filtrarSalientes);
+salientesHasta.addEventListener('change', filtrarSalientes);
+
