@@ -3,6 +3,7 @@
  **********************/
 let cargasSource = '';
 let transferenciasSource = [];
+let transferenciasSourceOriginal = [];
 let salientesSource = [];
 
 /**********************
@@ -57,13 +58,16 @@ xlsxInput.addEventListener('change', e => {
     const sheet = wb.Sheets[wb.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
-    transferenciasSource = rows
+    transferenciasSourceOriginal = rows
       .filter(r => r[3] === 'Transferencia entrante' && Number(r[5]) > 0)
       .map(r => ({
         raw: `${r[0]}\tTransferencia\t${normalizarMonto(r[5])}`,
         fecha: new Date(r[0]),
         montoCentavos: Number(r[5]) * 100
       }));
+
+    // fuente activa
+    transferenciasSource = [...transferenciasSourceOriginal];
 
     transferenciasInput.value =
       transferenciasSource.map(t => t.raw).join('\n');
@@ -79,13 +83,13 @@ xlsxInput.addEventListener('change', e => {
 });
 
 /**********************
- * FILTRO TRANSFERENCIAS (MONTO + FECHA/HORA)
+ * FILTRO TRANSFERENCIAS (AFECTA LA FUENTE)
  **********************/
 const fechaDesde = document.getElementById('fechaDesde');
 const fechaHasta = document.getElementById('fechaHasta');
 
 function filtrarTransferencias() {
-  let resultado = [...transferenciasSource];
+  let resultado = [...transferenciasSourceOriginal];
 
   // MONTO
   const montoBuscado = limpiarMonto(transferenciasFilter.value);
@@ -106,11 +110,18 @@ function filtrarTransferencias() {
     resultado = resultado.filter(t => t.fecha <= hasta);
   }
 
-  transferenciasFiltradas.value =
-    resultado.map(t => t.raw).join('\n');
+  // 🔥 REEMPLAZA LA FUENTE
+  transferenciasSource = resultado;
 
-  transferenciasCount.innerText =
-    `Transferencias filtradas: ${resultado.length}`;
+  transferenciasInput.value =
+    transferenciasSource.map(t => t.raw).join('\n');
+
+  transferenciasPreview.innerText =
+    `Transferencias importadas: ${transferenciasSource.length}`;
+
+  // limpiamos resultado inferior
+  transferenciasFiltradas.value = '';
+  transferenciasCount.innerText = 'Transferencias filtradas: 0';
 }
 
 transferenciasFilter.addEventListener('input', filtrarTransferencias);
@@ -264,10 +275,3 @@ salientesFilter.addEventListener('input', () => {
   salientesCount.innerText =
     `Transferencias: ${base.length} — Total: ${normalizarMonto(total)}`;
 });
-
-
-
-
-
-
-
