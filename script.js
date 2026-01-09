@@ -66,21 +66,27 @@ xlsxInput.addEventListener('change', e => {
         montoCentavos: Number(r[5]) * 100
       }));
 
-    // fuente activa
     transferenciasSource = [...transferenciasSourceOriginal];
 
-    transferenciasInput.value =
-      transferenciasSource.map(t => t.raw).join('\n');
-
-    transferenciasPreview.innerText =
-      `Transferencias importadas: ${transferenciasSource.length}`;
-
-    transferenciasFiltradas.value = '';
-    transferenciasCount.innerText = 'Transferencias filtradas: 0';
+    renderTransferenciasFuente();
   };
 
   reader.readAsBinaryString(file);
 });
+
+/**********************
+ * RENDER FUENTE TRANSFERENCIAS
+ **********************/
+function renderTransferenciasFuente() {
+  transferenciasInput.value =
+    transferenciasSource.map(t => t.raw).join('\n');
+
+  transferenciasPreview.innerText =
+    `Transferencias importadas: ${transferenciasSource.length}`;
+
+  transferenciasFiltradas.value = '';
+  transferenciasCount.innerText = 'Transferencias filtradas: 0';
+}
 
 /**********************
  * FILTRO TRANSFERENCIAS (AFECTA LA FUENTE)
@@ -91,42 +97,43 @@ const fechaHasta = document.getElementById('fechaHasta');
 function filtrarTransferencias() {
   let resultado = [...transferenciasSourceOriginal];
 
-  // MONTO
   const montoBuscado = limpiarMonto(transferenciasFilter.value);
   if (montoBuscado) {
     const centavos = Number(montoBuscado) * 100;
     resultado = resultado.filter(t => t.montoCentavos === centavos);
   }
 
-  // FECHA DESDE
   if (fechaDesde.value) {
     const desde = new Date(fechaDesde.value);
     resultado = resultado.filter(t => t.fecha >= desde);
   }
 
-  // FECHA HASTA
   if (fechaHasta.value) {
     const hasta = new Date(fechaHasta.value);
     resultado = resultado.filter(t => t.fecha <= hasta);
   }
 
-  // 🔥 REEMPLAZA LA FUENTE
   transferenciasSource = resultado;
-
-  transferenciasInput.value =
-    transferenciasSource.map(t => t.raw).join('\n');
-
-  transferenciasPreview.innerText =
-    `Transferencias importadas: ${transferenciasSource.length}`;
-
-  // limpiamos resultado inferior
-  transferenciasFiltradas.value = '';
-  transferenciasCount.innerText = 'Transferencias filtradas: 0';
+  renderTransferenciasFuente();
 }
 
 transferenciasFilter.addEventListener('input', filtrarTransferencias);
 fechaDesde.addEventListener('change', filtrarTransferencias);
 fechaHasta.addEventListener('change', filtrarTransferencias);
+
+/**********************
+ * RESTABLECER TRANSFERENCIAS
+ **********************/
+resetTransferenciasBtn.addEventListener('click', () => {
+  transferenciasSource = [...transferenciasSourceOriginal];
+
+  // limpiar filtros visuales
+  transferenciasFilter.value = '';
+  fechaDesde.value = '';
+  fechaHasta.value = '';
+
+  renderTransferenciasFuente();
+});
 
 /**********************
  * FILTRO CARGAS (MONTO)

@@ -48,8 +48,12 @@
         placeholder="Las cargas filtradas aparecerán aquí"
         readonly
       ></textarea>
+      
+
 
     </div>
+   
+
 
     <!-- ================== TRANSFERENCIAS ================== -->
     <div class="panel space-y-2">
@@ -60,7 +64,9 @@
           Transferencias importadas: 0
         </span>
       </div>
+      
       <div class="grid grid-cols-2 gap-2">
+        
   <input
     type="datetime-local"
     id="fechaDesde"
@@ -71,6 +77,12 @@
     id="fechaHasta"
     class="filter"
   >
+  <button
+  id="resetTransferenciasBtn"
+  class="btn bg-zinc-600 hover:bg-zinc-500 mt-2 px-2 py-0.5 text-xs w-auto">
+  Restablecer transferencias
+</button>
+
 </div>
 
 
