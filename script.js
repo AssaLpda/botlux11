@@ -2,8 +2,8 @@
  * VARIABLES FUENTE
  **********************/
 let cargasSource = '';
-let transferenciasSource = [];
 let transferenciasSourceOriginal = [];
+let transferenciasSource = [];
 
 let salientesSourceOriginal = [];
 let salientesSource = [];
@@ -34,13 +34,6 @@ function montoLineaACentavos(linea) {
   return Number(limpiarMonto(m));
 }
 
-function sumarMontos(lineas) {
-  return lineas.reduce((acc, l) => {
-    const v = montoLineaACentavos(l);
-    return v ? acc + v : acc;
-  }, 0) / 100;
-}
-
 /**********************
  * CARGAS MANUALES
  **********************/
@@ -49,10 +42,9 @@ cargasInput.addEventListener('input', () => {
 });
 
 /**********************
- * IMPORTAR XLSX (TRANSFERENCIAS ENTRANTES)
+ * IMPORTAR TRANSFERENCIAS ENTRANTES
  **********************/
 xlsxInput.addEventListener('change', e => {
-  const file = e.target.files[0];
   const reader = new FileReader();
 
   reader.onload = evt => {
@@ -70,39 +62,31 @@ xlsxInput.addEventListener('change', e => {
 
     transferenciasSource = [...transferenciasSourceOriginal];
     renderTransferenciasFuente();
+    limpiarTransferenciasFiltradas();
   };
 
-  reader.readAsBinaryString(file);
+  reader.readAsBinaryString(e.target.files[0]);
 });
 
 /**********************
- * RENDER FUENTE TRANSFERENCIAS
+ * RENDER FUENTE
  **********************/
 function renderTransferenciasFuente() {
   transferenciasInput.value =
     transferenciasSource.map(t => t.raw).join('\n');
 
   transferenciasPreview.innerText =
-    `Transferencias importadas: ${transferenciasSource.length}`;
-
-  transferenciasFiltradas.value = '';
-  transferenciasCount.innerText = 'Transferencias filtradas: 0';
+    `Transferencias visibles: ${transferenciasSource.length}`;
 }
 
 /**********************
- * FILTRO TRANSFERENCIAS (AFECTA LA FUENTE)
+ * FILTRO FECHA / HORA (AFECTA FUENTE)
  **********************/
 const fechaDesde = document.getElementById('fechaDesde');
 const fechaHasta = document.getElementById('fechaHasta');
 
-function filtrarTransferencias() {
+function filtrarTransferenciasPorFecha() {
   let resultado = [...transferenciasSourceOriginal];
-
-  const montoBuscado = limpiarMonto(transferenciasFilter.value);
-  if (montoBuscado) {
-    const centavos = Number(montoBuscado) * 100;
-    resultado = resultado.filter(t => t.montoCentavos === centavos);
-  }
 
   if (fechaDesde.value) {
     const desde = new Date(fechaDesde.value);
@@ -116,21 +100,56 @@ function filtrarTransferencias() {
 
   transferenciasSource = resultado;
   renderTransferenciasFuente();
+  filtrarTransferenciasPorMonto(); // reaplica abajo
 }
 
-transferenciasFilter.addEventListener('input', filtrarTransferencias);
-fechaDesde.addEventListener('change', filtrarTransferencias);
-fechaHasta.addEventListener('change', filtrarTransferencias);
+fechaDesde.addEventListener('change', filtrarTransferenciasPorFecha);
+fechaHasta.addEventListener('change', filtrarTransferenciasPorFecha);
+
+/**********************
+ * FILTRO MONTO (ABAJO)
+ **********************/
+function filtrarTransferenciasPorMonto() {
+  const buscado = limpiarMonto(transferenciasFilter.value);
+
+  if (!buscado) {
+    limpiarTransferenciasFiltradas();
+    return;
+  }
+
+  const centavos = Number(buscado) * 100;
+
+  const resultado = transferenciasSource.filter(
+    t => t.montoCentavos === centavos
+  );
+
+  transferenciasFiltradas.value =
+    resultado.map(t => t.raw).join('\n');
+
+  transferenciasCount.innerText =
+    `Transferencias filtradas: ${resultado.length}`;
+}
+
+transferenciasFilter.addEventListener('input', filtrarTransferenciasPorMonto);
+
+/**********************
+ * LIMPIAR FILTRADAS
+ **********************/
+function limpiarTransferenciasFiltradas() {
+  transferenciasFiltradas.value = '';
+  transferenciasCount.innerText = 'Transferencias filtradas: 0';
+}
 
 /**********************
  * RESTABLECER TRANSFERENCIAS
  **********************/
 resetTransferenciasBtn.addEventListener('click', () => {
   transferenciasSource = [...transferenciasSourceOriginal];
-  transferenciasFilter.value = '';
   fechaDesde.value = '';
   fechaHasta.value = '';
+  transferenciasFilter.value = '';
   renderTransferenciasFuente();
+  limpiarTransferenciasFiltradas();
 });
 
 /**********************
@@ -143,12 +162,11 @@ cargasFilter.addEventListener('input', () => {
     return;
   }
 
-  const base = cargasSource.split('\n');
   const buscadoCentavos = Number(limpiarMonto(cargasFilter.value)) * 100;
 
-  const resultado = base.filter(l =>
-    montoLineaACentavos(l) === buscadoCentavos
-  );
+  const resultado = cargasSource
+    .split('\n')
+    .filter(l => montoLineaACentavos(l) === buscadoCentavos);
 
   cargasFiltradas.value = resultado.join('\n');
   cargasCount.innerText = `Cargas filtradas: ${resultado.length}`;
@@ -206,7 +224,7 @@ compararBtn.addEventListener('click', () => {
 });
 
 /**********************
- * TRANSFERENCIAS SALIENTES (MODAL)
+ * TRANSFERENCIAS SALIENTES (SIN CAMBIOS)
  **********************/
 const CBU_EXCLUIDO = '000002334322884432';
 
@@ -224,11 +242,8 @@ closeSalientesBtn.addEventListener('click', () => {
   salientesModal.classList.remove('flex');
 });
 
-/**********************
- * IMPORTAR SALIENTES
- **********************/
+/* IMPORTAR SALIENTES */
 xlsxSalientesInput.addEventListener('change', e => {
-  const file = e.target.files[0];
   const reader = new FileReader();
 
   reader.onload = evt => {
@@ -252,12 +267,10 @@ xlsxSalientesInput.addEventListener('change', e => {
     renderSalientes();
   };
 
-  reader.readAsBinaryString(file);
+  reader.readAsBinaryString(e.target.files[0]);
 });
 
-/**********************
- * RENDER SALIENTES
- **********************/
+/* RENDER SALIENTES */
 function renderSalientes() {
   salientesOutput.value =
     salientesSource.map(s => s.raw).join('\n');
@@ -271,9 +284,7 @@ function renderSalientes() {
     `Transferencias: ${salientesSource.length} — Total: ${normalizarMonto(total)}`;
 }
 
-/**********************
- * FILTRO SALIENTES (MONTO + FECHA/HORA)
- **********************/
+/* FILTRO SALIENTES */
 function filtrarSalientes() {
   let resultado = [...salientesSourceOriginal];
 
@@ -300,4 +311,3 @@ function filtrarSalientes() {
 salientesFilter.addEventListener('input', filtrarSalientes);
 salientesDesde.addEventListener('change', filtrarSalientes);
 salientesHasta.addEventListener('change', filtrarSalientes);
-
