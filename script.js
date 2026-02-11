@@ -63,6 +63,7 @@ xlsxInput.addEventListener('change', e => {
     transferenciasSource = [...transferenciasSourceOriginal];
     renderTransferenciasFuente();
     limpiarTransferenciasFiltradas();
+    renderTotalTransferencias();
   };
 
   reader.readAsBinaryString(e.target.files[0]);
@@ -80,7 +81,20 @@ function renderTransferenciasFuente() {
 }
 
 /**********************
- * FILTRO FECHA / HORA (AFECTA FUENTE)
+ * TOTAL TRANSFERENCIAS RECIBIDAS
+ **********************/
+function renderTotalTransferencias(lista = transferenciasSource) {
+  const total = lista.reduce(
+    (acc, t) => acc + t.montoCentavos,
+    0
+  ) / 100;
+
+  transferenciasTotal.innerText =
+    `Total: ${normalizarMonto(total)}`;
+}
+
+/**********************
+ * FILTRO FECHA / HORA
  **********************/
 const fechaDesde = document.getElementById('fechaDesde');
 const fechaHasta = document.getElementById('fechaHasta');
@@ -100,20 +114,22 @@ function filtrarTransferenciasPorFecha() {
 
   transferenciasSource = resultado;
   renderTransferenciasFuente();
-  filtrarTransferenciasPorMonto(); // reaplica abajo
+  filtrarTransferenciasPorMonto();
+  renderTotalTransferencias();
 }
 
 fechaDesde.addEventListener('change', filtrarTransferenciasPorFecha);
 fechaHasta.addEventListener('change', filtrarTransferenciasPorFecha);
 
 /**********************
- * FILTRO MONTO (ABAJO)
+ * FILTRO MONTO
  **********************/
 function filtrarTransferenciasPorMonto() {
   const buscado = limpiarMonto(transferenciasFilter.value);
 
   if (!buscado) {
     limpiarTransferenciasFiltradas();
+    renderTotalTransferencias();
     return;
   }
 
@@ -128,6 +144,8 @@ function filtrarTransferenciasPorMonto() {
 
   transferenciasCount.innerText =
     `Transferencias filtradas: ${resultado.length}`;
+
+  renderTotalTransferencias(resultado);
 }
 
 transferenciasFilter.addEventListener('input', filtrarTransferenciasPorMonto);
@@ -150,6 +168,7 @@ resetTransferenciasBtn.addEventListener('click', () => {
   transferenciasFilter.value = '';
   renderTransferenciasFuente();
   limpiarTransferenciasFiltradas();
+  renderTotalTransferencias();
 });
 
 /**********************
