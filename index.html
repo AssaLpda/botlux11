@@ -1,227 +1,146 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <title>Control de Cargas vs Transferencias</title>
-
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-
-  <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Comparacion🙄</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+            filter: invert(1); /* Hace que el icono del calendario sea blanco */
+        }
+    </style>
 </head>
+<body class="bg-zinc-900 text-zinc-200 min-h-screen p-4 font-sans">
+    <div class="max-w-6xl mx-auto">
+        <header class="mb-6 border-b border-zinc-700 pb-4 flex justify-between items-end">
+            <div>
+                <h1 class="text-2xl font-black text-green-500 uppercase tracking-tighter">Bot de Comparacion</h1>
+                <p class="text-zinc-500 text-[10px] uppercase font-bold tracking-widest">Le facilitamos el trabajo a Antonella una vez mas🙄</p>
+            </div>
+            <div id="reloj" class="text-zinc-500 font-mono text-xs"></div>
+        </header>
 
-<body class="bg-zinc-900 text-zinc-100 min-h-screen p-6">
+        <div class="flex flex-wrap gap-3 mb-4">
+            <div class="bg-zinc-800/50 border border-zinc-700 rounded-lg p-3 flex-1 min-w-[150px] shadow-sm">
+                <span class="text-[9px] uppercase text-zinc-500 font-black block mb-1">Cargas del Turno</span>
+                <span id="countCargas" class="text-green-500 font-mono font-bold text-lg">0 / 0</span>
+            </div>
+            <div class="bg-zinc-800/50 border border-zinc-700 rounded-lg p-3 flex-1 min-w-[150px] shadow-sm">
+                <span class="text-[9px] uppercase text-zinc-500 font-black block mb-1">Transf. en Rango</span>
+                <span id="countExcel" class="text-blue-400 font-mono font-bold text-lg">0 / 0</span>
+            </div>
+            <div class="bg-zinc-800/50 border border-zinc-700 rounded-lg p-3 flex-1 min-w-[150px] shadow-sm">
+                <span class="text-[9px] uppercase text-zinc-500 font-black block mb-1">Bonos Detectados</span>
+                <span id="countBonos" class="text-yellow-500 font-mono font-bold text-lg">0 / 0</span>
+            </div>
+        </div>
 
-<div class="max-w-7xl mx-auto space-y-6">
-  <h1 class="text-2xl font-bold">🎰 Control 1 a 1 – Cargas vs Transferencias</h1>
+        <div class="mb-8 bg-zinc-800 p-5 rounded-xl shadow-2xl border border-zinc-700 space-y-4">
+            <div class="flex flex-col md:flex-row gap-4 items-center">
+                <div class="flex items-center gap-2 text-green-500">
+                    <span class="font-bold uppercase text-[10px] tracking-widest">🔍 Buscar:</span>
+                </div>
+                <input type="text" id="filtroMonto" oninput="aplicarFiltros()" 
+                    class="bg-zinc-900 border border-zinc-700 rounded-lg p-2.5 text-sm w-full md:w-44 focus:ring-1 focus:ring-green-500 outline-none font-mono" 
+                    placeholder="Monto (ej: 2000)">
+                <input type="text" id="filtroNombre" oninput="aplicarFiltros()" 
+                    class="bg-zinc-900 border border-zinc-700 rounded-lg p-2.5 text-sm flex-1 w-full focus:ring-1 focus:ring-green-500 outline-none" 
+                    placeholder="Nombre del cliente o usuario...">
+            </div>
 
-  <!-- ================== INPUTS ================== -->
-  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="flex flex-col md:flex-row gap-4 items-center border-t border-zinc-700 pt-4">
+                <div class="flex items-center gap-2 text-blue-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span class="font-bold uppercase text-[10px] tracking-widest">🕒 Filtro de Turno:</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div class="flex flex-col">
+                        <span class="text-[8px] text-zinc-500 uppercase ml-1">Desde</span>
+                        <input type="datetime-local" id="turnoDesde" onchange="aplicarFiltros()" 
+                            class="bg-zinc-900 border border-zinc-700 rounded p-2 text-xs text-zinc-300 outline-none focus:border-blue-500">
+                    </div>
+                    <div class="flex flex-col">
+                        <span class="text-[8px] text-zinc-500 uppercase ml-1">Hasta</span>
+                        <input type="datetime-local" id="turnoHasta" onchange="aplicarFiltros()" 
+                            class="bg-zinc-900 border border-zinc-700 rounded p-2 text-xs text-zinc-300 outline-none focus:border-blue-500">
+                    </div>
+                </div>
+                <button onclick="limpiarFiltros()" class="text-[10px] text-zinc-500 hover:text-white uppercase font-bold ml-auto tracking-tighter underline">
+                    Limpiar Filtros
+                </button>
+            </div>
+        </div>
 
-    <!-- ================== CARGAS ================== -->
-    <div class="panel space-y-2">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <div class="space-y-2">
+                <label class="text-[10px] font-black text-zinc-500 uppercase tracking-widest">1. Pegar Cargas (Texto)</label>
+                <textarea id="textoCargas" 
+                    class="w-full h-32 p-3 bg-zinc-800 border border-zinc-700 rounded-xl focus:ring-2 focus:ring-green-500/30 outline-none text-xs font-mono scrollbar-hide"
+                    placeholder="2026-03-12..."></textarea>
+                <div id="resultadoCargas" class="h-48 overflow-y-auto bg-black/40 rounded-xl p-3 text-[11px] border border-zinc-800 font-mono shadow-inner space-y-1">
+                    <span class="text-zinc-700 italic text-[9px]">Previsualización de cargas...</span>
+                </div>
+            </div>
 
-      <div class="flex justify-between items-center">
-        <h2 class="title">Cargas realizadas (fuente)</h2>
-      </div>
+            <div class="space-y-2">
+                <label class="text-[10px] font-black text-zinc-500 uppercase tracking-widest">2. Cargar Excel (.xlsx)</label>
+                <div class="bg-zinc-800 border border-zinc-700 rounded-xl p-2 px-4">
+                    <input type="file" id="inputExcel" accept=".xlsx" 
+                        class="block w-full text-xs text-zinc-400 file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-zinc-700 file:text-zinc-200 hover:file:bg-zinc-600 cursor-pointer font-bold">
+                </div>
+                <div id="resultadoExcel" class="h-60 overflow-y-auto bg-black/40 rounded-xl p-3 text-[11px] border border-zinc-800 font-mono mt-2 shadow-inner space-y-1">
+                    <span class="text-zinc-700 italic text-[9px]">Previsualización del Excel filtrado por turno...</span>
+                </div>
+            </div>
+        </div>
 
-      <textarea
-        id="cargasInput"
-        placeholder="2025-12-11 17:22:06	usuario	Carga	29.000,00"
-      ></textarea>
+        <div class="flex justify-center mb-10">
+            <button onclick="conciliar()" 
+                class="bg-green-600 hover:bg-green-500 text-white font-black py-4 px-24 rounded-xl shadow-lg transition-all active:scale-95 border-b-4 border-green-800 uppercase tracking-widest text-sm">
+                Comprobar
+            </button>
+        </div>
 
-      <input
-        id="cargasFilter"
-        class="filter"
-        placeholder="Filtrar monto (ej: 2000, 2.000, 2.000,00)"
-      >
+        <div class="bg-zinc-800 rounded-2xl shadow-2xl border border-zinc-700 overflow-hidden mb-8">
+            <div class="bg-zinc-900/50 p-4 border-b border-zinc-700">
+                <h2 class="text-xs font-black text-green-500 uppercase tracking-widest text-center">📊 Comparativa de Caja por Turno</h2>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-zinc-900/30 text-[9px] uppercase text-zinc-500 tracking-widest">
+                            <th class="p-4 border-b border-zinc-700">Monto Entero</th>
+                            <th class="p-4 border-b border-zinc-700 text-center">Cargas</th>
+                            <th class="p-4 border-b border-zinc-700 text-center">Excel (Turno)</th>
+                            <th class="p-4 border-b border-zinc-700 text-right pr-8">Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaComparativa" class="divide-y divide-zinc-700/50"></tbody>
+                </table>
+            </div>
+        </div>
 
-      <!-- RESULTADO FILTRADO -->
-      <div class="flex justify-between items-center mt-2">
-        <span class="hint">Resultado filtrado</span>
-        <span id="cargasCount" class="hint">Cargas filtradas: 0</span>
-      </div>
-
-      <textarea
-        id="cargasFiltradas"
-        class="bg-zinc-950"
-        placeholder="Las cargas filtradas aparecerán aquí"
-        readonly
-      ></textarea>
-      
-
-
-    </div>
-   
-
-
-    <!-- ================== TRANSFERENCIAS ================== -->
-    <div class="panel space-y-2">
-
-      <div class="flex justify-between items-center">
-        <h2 class="title">Transferencias recibidas (fuente)</h2>
-        <span id="transferenciasPreview" class="hint">
-          Transferencias importadas: 0
-        </span>
-      </div>
-      
-      <div class="grid grid-cols-2 gap-2">
-        
-  <input
-    type="datetime-local"
-    id="fechaDesde"
-    class="filter"
-  >
-  <input
-    type="datetime-local"
-    id="fechaHasta"
-    class="filter"
-  >
-  <button
-  id="resetTransferenciasBtn"
-  class="btn bg-zinc-600 hover:bg-zinc-500 mt-2 px-2 py-0.5 text-xs w-auto">
-  Restablecer transferencias
-</button>
-
-</div>
-
-
-      <textarea
-        id="transferenciasInput"
-        placeholder="Se cargan automáticamente desde XLSX"
-        readonly
-      ></textarea>
-
-      <input
-        id="transferenciasFilter"
-        class="filter"
-        placeholder="Filtrar monto (ej: 2000, 2.000, 2.000,00)"
-      >
-
-      <input
-        type="file"
-        id="xlsxInput"
-        accept=".xlsx"
-        class="mt-1 text-sm"
-      >
-
-      <!-- RESULTADO FILTRADO -->
-      <div class="flex justify-between items-center mt-2">
-        <span class="hint">Resultado filtrado</span>
-        <span id="transferenciasCount" class="hint">
-          Transferencias filtradas: 0
-        </span>
-      </div>
-
-      <textarea
-        id="transferenciasFiltradas"
-        class="bg-zinc-950"
-        placeholder="Las transferencias filtradas aparecerán aquí"
-        readonly
-      ></textarea>
-      <div id="transferenciasTotal" class="hint mt-1">
-  Total: $0,00
-</div>
-
-    </div>
-
-
-    
-
-  </div>
-
-  <!-- ================== COMPARAR ================== -->
-  <button id="compararBtn" class="btn">
-    Comparar
-  </button>
-
-  <button id="openSalientesBtn" class="btn bg-indigo-600 hover:bg-indigo-500">
-  Buscar transferencias salientes
-</button>
-
-
-  <!-- ================== RESULTADOS ================== -->
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-
-    <div class="panel">
-      <h3 class="ok">✔ Coincidencias</h3>
-      <ul id="okList" class="space-y-1"></ul>
+        <div class="bg-zinc-800 p-6 rounded-2xl shadow border-l-8 border-yellow-600 mb-12">
+            <h2 class="text-lg font-black text-yellow-500 uppercase tracking-tighter mb-4">Regalos y Bonos</h2>
+            <div id="listaBonificacionesIndependiente" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <p class="text-zinc-600 text-xs italic">No hay bonos registrados.</p>
+            </div>
+        </div>
     </div>
 
-    <div class="panel">
-      <h3 class="bonus">🎁 Bonificaciones</h3>
-      <ul id="bonusList" class="space-y-1"></ul>
-    </div>
-
-    <div class="panel">
-      <h3 class="error">⚠ Diferencias</h3>
-      <ul id="errorList" class="space-y-1"></ul>
-    </div>
-
-  </div>
-
-</div>
-<!-- MODAL TRANSFERENCIAS SALIENTES -->
-<div id="salientesModal"
-     class="fixed inset-0 bg-black/70 hidden items-center justify-center z-50">
-
-  <div class="bg-zinc-900 w-full max-w-3xl rounded-xl p-6 space-y-4">
-
-    <div class="flex justify-between items-center">
-      <h2 class="text-xl font-bold">📤 Transferencias salientes</h2>
-      <button id="closeSalientesBtn"
-        class="text-zinc-400 hover:text-white">✕</button>
-    </div>
-
-    <!-- IMPORTAR XLSX -->
-    <input
-      type="file"
-      id="xlsxSalientesInput"
-      accept=".xlsx"
-      class="text-sm"
-    >
-
-    <!-- FILTRO POR MONTO -->
-    <input
-      id="salientesFilter"
-      class="filter"
-      placeholder="Filtrar monto (ej: 10000, 10.000, 10.000,00)"
-    >
-    <div class="grid grid-cols-2 gap-2">
-  <input
-    type="datetime-local"
-    id="salientesDesde"
-    class="filter"
-  >
-  <input
-    type="datetime-local"
-    id="salientesHasta"
-    class="filter"
-  >
-</div>
-
-
-    <!-- RESULTADO -->
-    <textarea
-      id="salientesOutput"
-      class="w-full h-64 bg-zinc-950 rounded p-3 text-sm"
-      placeholder="Aquí se mostrarán las transferencias salientes"
-      readonly
-    ></textarea>
-
-    <!-- CONTADOR + TOTAL -->
-    <div id="salientesCount" class="text-sm text-zinc-400">
-      Transferencias: 0 — Total: $0,00
-    </div>
-
-  </div>
-</div>
-
-
-
-<script src="script.js"></script>
+    <script src="script.js"></script>
+    <script>
+        // Actualizar reloj dinámico
+        setInterval(() => {
+            const ahora = new Date();
+            document.getElementById('reloj').textContent = ahora.toLocaleString('es-AR');
+        }, 1000);
+    </script>
 </body>
 </html>
-
-
-
