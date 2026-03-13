@@ -1,258 +1,332 @@
-// Variables globales
-let datosCargasRaw = [];
-let datosExcelRaw = [];
-let datosBonificacionesRaw = [];
+/**********************
+ * VARIABLES FUENTE
+ **********************/
+let cargasSource = '';
+let transferenciasSourceOriginal = [];
+let transferenciasSource = [];
 
-/**
- * Normaliza montos (ej: "7.800,84" -> 7800.84)
- */
-function normalizarMonto(valor) {
-    if (!valor) return 0;
-    let str = valor.toString().trim();
-    str = str.replace(/\./g, '').replace(',', '.');
-    return parseFloat(str) || 0;
+let salientesSourceOriginal = [];
+let salientesSource = [];
+
+/**********************
+ * HELPERS
+ **********************/
+function limpiarMonto(v) {
+  return v.replace(/[^\d]/g, '');
 }
 
-/**
- * Procesa fechas de Excel/Texto para que sean compatibles con el filtro de turno
- * Maneja el formato: "11/03/2026, 01:03:24"
- */
-function parsearFechaUniversal(fechaInput) {
-    if (fechaInput instanceof Date) return fechaInput;
-    
-    let str = fechaInput.toString().trim();
-    // Quitamos la coma si existe para evitar conflictos
-    str = str.replace(',', '');
+function normalizarMonto(num) {
+  const entero = Math.floor(Number(num));
+  return entero.toLocaleString('es-AR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+}
 
-    // Si detectamos formato DD/MM/YYYY
-    if (str.includes('/')) {
-        const partes = str.split(' ');
-        const fechaPartes = partes[0].split('/');
-        const dia = fechaPartes[0].padStart(2, '0');
-        const mes = fechaPartes[1].padStart(2, '0');
-        const anio = fechaPartes[2];
-        const hora = partes[1] || "00:00:00";
-        // Re-ensamblamos en formato ISO (YYYY-MM-DDTHH:mm:ss) para seguridad total
-        return new Date(`${anio}-${mes}-${dia}T${hora}`);
+function extraerMontoLinea(linea) {
+  const m = linea.match(/-?\d{1,3}(?:\.\d{3})*,\d{2}/);
+  return m ? m[0] : null;
+}
+
+function montoLineaACentavos(linea) {
+  const m = extraerMontoLinea(linea);
+  if (!m) return null;
+  return Number(limpiarMonto(m));
+}
+
+/**********************
+ * CARGAS MANUALES
+ **********************/
+cargasInput.addEventListener('input', () => {
+  cargasSource = cargasInput.value;
+});
+
+/**********************
+ * IMPORTAR TRANSFERENCIAS ENTRANTES
+ **********************/
+xlsxInput.addEventListener('change', e => {
+  const reader = new FileReader();
+
+  reader.onload = evt => {
+    const wb = XLSX.read(evt.target.result, { type: 'binary' });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+    transferenciasSourceOriginal = rows
+      .filter(r => r[3] === 'Transferencia entrante' && Number(r[5]) > 0)
+      .map(r => ({
+        raw: `${r[0]}\tTransferencia\t${normalizarMonto(r[5])}`,
+        fecha: new Date(r[0]),
+        montoCentavos: Number(r[5]) * 100
+      }));
+
+    transferenciasSource = [...transferenciasSourceOriginal];
+    renderTransferenciasFuente();
+    limpiarTransferenciasFiltradas();
+    renderTotalTransferencias();
+  };
+
+  reader.readAsBinaryString(e.target.files[0]);
+});
+
+/**********************
+ * RENDER FUENTE
+ **********************/
+function renderTransferenciasFuente() {
+  transferenciasInput.value =
+    transferenciasSource.map(t => t.raw).join('\n');
+
+  transferenciasPreview.innerText =
+    `Transferencias visibles: ${transferenciasSource.length}`;
+}
+
+/**********************
+ * TOTAL TRANSFERENCIAS RECIBIDAS
+ **********************/
+function renderTotalTransferencias(lista = transferenciasSource) {
+  const total = lista.reduce(
+    (acc, t) => acc + t.montoCentavos,
+    0
+  ) / 100;
+
+  transferenciasTotal.innerText =
+    `Total: ${normalizarMonto(total)}`;
+}
+
+/**********************
+ * FILTRO FECHA / HORA
+ **********************/
+const fechaDesde = document.getElementById('fechaDesde');
+const fechaHasta = document.getElementById('fechaHasta');
+
+function filtrarTransferenciasPorFecha() {
+  let resultado = [...transferenciasSourceOriginal];
+
+  if (fechaDesde.value) {
+    const desde = new Date(fechaDesde.value);
+    resultado = resultado.filter(t => t.fecha >= desde);
+  }
+
+  if (fechaHasta.value) {
+    const hasta = new Date(fechaHasta.value);
+    resultado = resultado.filter(t => t.fecha <= hasta);
+  }
+
+  transferenciasSource = resultado;
+  renderTransferenciasFuente();
+  filtrarTransferenciasPorMonto();
+  renderTotalTransferencias();
+}
+
+fechaDesde.addEventListener('change', filtrarTransferenciasPorFecha);
+fechaHasta.addEventListener('change', filtrarTransferenciasPorFecha);
+
+/**********************
+ * FILTRO MONTO
+ **********************/
+function filtrarTransferenciasPorMonto() {
+  const buscado = limpiarMonto(transferenciasFilter.value);
+
+  if (!buscado) {
+    limpiarTransferenciasFiltradas();
+    renderTotalTransferencias();
+    return;
+  }
+
+  const centavos = Number(buscado) * 100;
+
+  const resultado = transferenciasSource.filter(
+    t => t.montoCentavos === centavos
+  );
+
+  transferenciasFiltradas.value =
+    resultado.map(t => t.raw).join('\n');
+
+  transferenciasCount.innerText =
+    `Transferencias filtradas: ${resultado.length}`;
+
+  renderTotalTransferencias(resultado);
+}
+
+transferenciasFilter.addEventListener('input', filtrarTransferenciasPorMonto);
+
+/**********************
+ * LIMPIAR FILTRADAS
+ **********************/
+function limpiarTransferenciasFiltradas() {
+  transferenciasFiltradas.value = '';
+  transferenciasCount.innerText = 'Transferencias filtradas: 0';
+}
+
+/**********************
+ * RESTABLECER TRANSFERENCIAS
+ **********************/
+resetTransferenciasBtn.addEventListener('click', () => {
+  transferenciasSource = [...transferenciasSourceOriginal];
+  fechaDesde.value = '';
+  fechaHasta.value = '';
+  transferenciasFilter.value = '';
+  renderTransferenciasFuente();
+  limpiarTransferenciasFiltradas();
+  renderTotalTransferencias();
+});
+
+/**********************
+ * FILTRO CARGAS
+ **********************/
+cargasFilter.addEventListener('input', () => {
+  if (!cargasFilter.value) {
+    cargasFiltradas.value = '';
+    cargasCount.innerText = 'Cargas filtradas: 0';
+    return;
+  }
+
+  const buscadoCentavos = Number(limpiarMonto(cargasFilter.value)) * 100;
+
+  const resultado = cargasSource
+    .split('\n')
+    .filter(l => montoLineaACentavos(l) === buscadoCentavos);
+
+  cargasFiltradas.value = resultado.join('\n');
+  cargasCount.innerText = `Cargas filtradas: ${resultado.length}`;
+});
+
+/**********************
+ * COMPARAR
+ **********************/
+compararBtn.addEventListener('click', () => {
+  okList.innerHTML = '';
+  bonusList.innerHTML = '';
+  errorList.innerHTML = '';
+
+  const cargas = cargasSource
+    .split('\n')
+    .map(l => {
+      const tipo = l.includes('Bonificacion') ? 'BONO' : 'CARGA';
+      const monto = extraerMontoLinea(l);
+      return monto ? { tipo, monto } : null;
+    })
+    .filter(Boolean);
+
+  const agrupadas = {};
+
+  cargas.forEach(c => {
+    if (!agrupadas[c.monto]) {
+      agrupadas[c.monto] = { carga: 0, bono: 0, trans: 0 };
     }
-    
-    return new Date(str);
-}
+    if (c.tipo === 'BONO') agrupadas[c.monto].bono++;
+    else agrupadas[c.monto].carga++;
+  });
 
-// --- 1. PROCESAR TEXTO (PANEL IZQUIERDO) ---
-document.getElementById('textoCargas').addEventListener('input', function(e) {
-    const lineas = e.target.value.split('\n');
-    datosCargasRaw = [];
-    datosBonificacionesRaw = [];
+  transferenciasSource.forEach(t => {
+    const m = extraerMontoLinea(t.raw);
+    if (!m) return;
+    if (!agrupadas[m]) {
+      agrupadas[m] = { carga: 0, bono: 0, trans: 0 };
+    }
+    agrupadas[m].trans++;
+  });
 
-    lineas.forEach(linea => {
-        if (linea.trim() === '' || linea.length < 18) return;
-        
-        const fechaStr = linea.substring(0, 10);
-        const horaStr = linea.substring(10, 18);
-        const partes = linea.trim().split(/\s+/);
-        const monto = normalizarMonto(partes[partes.length - 1]);
-        const usuario = partes[1] || "Usuario";
+  Object.entries(agrupadas).forEach(([monto, d]) => {
+    if (d.bono > 0) {
+      bonusList.innerHTML += `<li class="text-yellow-400">🎁 ${d.bono} bonificación(es) de ${monto}</li>`;
+    }
 
-        // Intentamos parsear la fecha del texto (asumiendo YYYY-MM-DD)
-        const fechaObj = new Date(`${fechaStr}T${horaStr}`);
-
-        const item = { 
-            fechaObj, 
-            horaStr, 
-            usuario, 
-            monto, 
-            esBonif: linea.toUpperCase().includes("BONIFICACION") 
-        };
-        
-        if (item.esBonif) datosBonificacionesRaw.push(item);
-        else datosCargasRaw.push(item);
-    });
-    aplicarFiltros();
-});
-
-// --- 2. PROCESAR EXCEL (PANEL DERECHO) ---
-document.getElementById('inputExcel').addEventListener('change', function(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = function(event) {
-        const data = new Uint8Array(event.target.result);
-        const workbook = XLSX.read(data, { type: 'array', cellDates: true });
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const json = XLSX.utils.sheet_to_json(sheet);
-        datosExcelRaw = [];
-
-        json.forEach(fila => {
-            let keyMonto = Object.keys(fila).find(k => k.toLowerCase().includes('monto'));
-            let keyNombre = Object.keys(fila).find(k => k.toLowerCase().includes('nombre') || k.toLowerCase().includes('remitente'));
-            let keyFecha = Object.keys(fila).find(k => k.toLowerCase().includes('fecha'));
-            
-            let monto = keyMonto ? normalizarMonto(fila[keyMonto]) : 0;
-            let nombre = fila[keyNombre] || "N/D";
-            let fechaRaw = fila[keyFecha];
-
-            if (!fechaRaw) return;
-
-            let fechaObj = parsearFechaUniversal(fechaRaw);
-
-            if (nombre.toString().toUpperCase().trim() === "GROWING AGROPECUARIA S.A") return;
-
-            if (monto > 0 && !isNaN(fechaObj.getTime())) {
-                datosExcelRaw.push({ monto, nombre, fechaObj });
-            }
-        });
-        aplicarFiltros();
-    };
-    reader.readAsArrayBuffer(file);
-});
-
-// --- 3. LÓGICA DE FILTRADO (TIEMPO REAL) ---
-function aplicarFiltros() {
-    const fMontoInput = document.getElementById('filtroMonto').value.trim();
-    const fNombre = document.getElementById('filtroNombre').value.toLowerCase();
-    
-    const desdeVal = document.getElementById('turnoDesde').value;
-    const hastaVal = document.getElementById('turnoHasta').value;
-    const dateDesde = desdeVal ? new Date(desdeVal).getTime() : null;
-    const dateHasta = hastaVal ? new Date(hastaVal).getTime() : null;
-
-    const fMontoNum = fMontoInput !== "" ? Math.floor(normalizarMonto(fMontoInput)) : null;
-
-    const filtrar = (lista, campoNombre) => lista.filter(item => {
-        const montoMatch = fMontoNum === null || Math.floor(item.monto) === fMontoNum;
-        const nombreMatch = fNombre === "" || item[campoNombre].toLowerCase().includes(fNombre);
-        
-        let turnoMatch = true;
-        const itemTime = item.fechaObj.getTime();
-        if (dateDesde && itemTime < dateDesde) turnoMatch = false;
-        if (dateHasta && itemTime > dateHasta) turnoMatch = false;
-
-        return montoMatch && nombreMatch && turnoMatch;
-    });
-
-    const cargasFiltradas = filtrar(datosCargasRaw, 'usuario');
-    const bonosFiltrados = filtrar(datosBonificacionesRaw, 'usuario');
-    const excelFiltrado = filtrar(datosExcelRaw, 'nombre');
-
-    document.getElementById('countCargas').textContent = `${cargasFiltradas.length} / ${datosCargasRaw.length}`;
-    document.getElementById('countExcel').textContent = `${excelFiltrado.length} / ${datosExcelRaw.length}`;
-    document.getElementById('countBonos').textContent = `${bonosFiltrados.length} / ${datosBonificacionesRaw.length}`;
-
-    renderizarCargas(cargasFiltradas, bonosFiltrados);
-    renderizarExcel(excelFiltrado);
-}
-
-function renderizarCargas(cargas, bonos) {
-    const vis = document.getElementById('resultadoCargas');
-    vis.innerHTML = '';
-    
-    bonos.forEach(b => {
-        vis.innerHTML += `
-            <div class="text-yellow-500 italic border-b border-zinc-800 py-1 flex justify-between text-[10px]">
-                <span>🎁 BONO: ${b.usuario}</span>
-                <span class="font-bold">$${b.monto.toLocaleString('es-AR')}</span>
-            </div>`;
-    });
-    cargas.forEach(c => {
-        const h = c.fechaObj.getHours().toString().padStart(2, '0');
-        const m = c.fechaObj.getMinutes().toString().padStart(2, '0');
-        vis.innerHTML += `
-            <div class="border-b border-zinc-800 py-1 flex justify-between text-[10px]">
-                <span><span class="text-zinc-500">${h}:${m}</span> | ${c.usuario}</span>
-                <span class="text-green-400 font-bold">$${c.monto.toLocaleString('es-AR')}</span>
-            </div>`;
-    });
-}
-
-function renderizarExcel(excel) {
-    const vis = document.getElementById('resultadoExcel');
-    vis.innerHTML = '';
-    excel.forEach(e => {
-        const h = e.fechaObj.getHours().toString().padStart(2, '0');
-        const m = e.fechaObj.getMinutes().toString().padStart(2, '0');
-        vis.innerHTML += `
-            <div class="border-b border-zinc-800 py-1 flex justify-between text-[10px]">
-                <span><span class="text-zinc-500">${h}:${m}</span> | <span class="text-zinc-400 truncate w-32 inline-block align-bottom">${e.nombre}</span></span>
-                <span class="text-blue-400 font-bold">$${e.monto.toLocaleString('es-AR')}</span>
-            </div>`;
-    });
-}
-
-function limpiarFiltros() {
-    document.getElementById('filtroMonto').value = "";
-    document.getElementById('filtroNombre').value = "";
-    document.getElementById('turnoDesde').value = "";
-    document.getElementById('turnoHasta').value = "";
-    aplicarFiltros();
-}
-
-// --- 4. CONCILIACIÓN FINAL ---
-function conciliar() {
-    const desdeVal = document.getElementById('turnoDesde').value;
-    const hastaVal = document.getElementById('turnoHasta').value;
-    const dD = desdeVal ? new Date(desdeVal).getTime() : null;
-    const dH = hastaVal ? new Date(hastaVal).getTime() : null;
-
-    const filtrarTurno = (lista) => lista.filter(i => {
-        const t = i.fechaObj.getTime();
-        return (!dD || t >= dD) && (!dH || t <= dH);
-    });
-
-    const cargasTurno = filtrarTurno(datosCargasRaw);
-    const excelTurno = filtrarTurno(datosExcelRaw);
-
-    const cuerpoTabla = document.getElementById('tablaComparativa');
-    cuerpoTabla.innerHTML = '';
-
-    const conteoCargas = {};
-    const conteoExcel = {};
-
-    cargasTurno.forEach(m => {
-        let entero = Math.floor(m.monto); 
-        conteoCargas[entero] = (conteoCargas[entero] || 0) + 1;
-    });
-    excelTurno.forEach(m => {
-        let entero = Math.floor(m.monto);
-        conteoExcel[entero] = (conteoExcel[entero] || 0) + 1;
-    });
-
-    const montosUnicos = [...new Set([...Object.keys(conteoCargas), ...Object.keys(conteoExcel)])];
-    montosUnicos.sort((a, b) => b - a);
-
-    montosUnicos.forEach(monto => {
-        const cC = conteoCargas[monto] || 0;
-        const cE = conteoExcel[monto] || 0;
-        const coincide = cC === cE;
-
-        const tr = document.createElement('tr');
-        tr.className = coincide ? "bg-green-500/5" : "bg-red-500/5";
-        tr.innerHTML = `
-            <td class="p-3 border-b border-zinc-700 font-mono text-yellow-500 font-bold">$ ${parseInt(monto).toLocaleString('es-AR')}</td>
-            <td class="p-3 border-b border-zinc-700 text-center font-bold text-lg">${cC}</td>
-            <td class="p-3 border-b border-zinc-700 text-center font-bold text-lg">${cE}</td>
-            <td class="p-3 border-b border-zinc-700 text-center font-bold text-[10px] uppercase">
-                ${coincide ? '<span class="text-green-500">✅ OK</span>' : (cC > cE ? '<span class="text-red-500">❌ FALTA</span>' : '<span class="text-blue-400">⚠️ SOBRA</span>')}
-            </td>
-        `;
-        cuerpoTabla.appendChild(tr);
-    });
-
-    // Actualizar Bonos en el panel inferior
-    const listaBono = document.getElementById('listaBonificacionesIndependiente');
-    listaBono.innerHTML = '';
-    const bonosTurno = filtrarTurno(datosBonificacionesRaw);
-
-    if (bonosTurno.length === 0) {
-        listaBono.innerHTML = '<p class="text-zinc-600 text-xs italic py-4">Sin bonos en este rango.</p>';
+    if (d.carga === d.trans) {
+      okList.innerHTML += `<li class="text-emerald-400">✔ ${d.carga} carga(s) OK de ${monto}</li>`;
+    } else if (d.carga > d.trans) {
+      errorList.innerHTML += `<li class="text-red-400">❌ Faltan ${d.carga - d.trans} transferencia(s) de ${monto}</li>`;
     } else {
-        bonosTurno.forEach(b => {
-            listaBono.innerHTML += `
-                <div class="bg-zinc-900 p-2 rounded border border-zinc-700 flex justify-between items-center text-xs">
-                    <span class="text-blue-400 font-bold">${b.usuario}</span>
-                    <span class="text-yellow-500 font-bold">$${b.monto.toLocaleString('es-AR')}</span>
-                </div>`;
-        });
+      errorList.innerHTML += `<li class="text-red-400">⚠ Sobran ${d.trans - d.carga} transferencia(s) de ${monto}</li>`;
     }
+  });
+});
+
+/**********************
+ * TRANSFERENCIAS SALIENTES (SIN CAMBIOS)
+ **********************/
+const CBU_EXCLUIDO = '000002334322884432';
+
+const salientesFilter = document.getElementById('salientesFilter');
+const salientesDesde = document.getElementById('salientesDesde');
+const salientesHasta = document.getElementById('salientesHasta');
+
+openSalientesBtn.addEventListener('click', () => {
+  salientesModal.classList.remove('hidden');
+  salientesModal.classList.add('flex');
+});
+
+closeSalientesBtn.addEventListener('click', () => {
+  salientesModal.classList.add('hidden');
+  salientesModal.classList.remove('flex');
+});
+
+/* IMPORTAR SALIENTES */
+xlsxSalientesInput.addEventListener('change', e => {
+  const reader = new FileReader();
+
+  reader.onload = evt => {
+    const wb = XLSX.read(evt.target.result, { type: 'binary' });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+    salientesSourceOriginal = rows
+      .filter(r =>
+        r[3] === 'Transferencia saliente' &&
+        Number(r[4]) > 0 &&
+        !String(r[2] || '').includes(CBU_EXCLUIDO)
+      )
+      .map(r => ({
+        raw: `${r[0]}\t${r[2]}\t${normalizarMonto(r[4])}`,
+        fecha: new Date(r[0]),
+        montoCentavos: Number(r[4]) * 100
+      }));
+
+    salientesSource = [...salientesSourceOriginal];
+    renderSalientes();
+  };
+
+  reader.readAsBinaryString(e.target.files[0]);
+});
+
+/* RENDER SALIENTES */
+function renderSalientes() {
+  salientesOutput.value =
+    salientesSource.map(s => s.raw).join('\n');
+
+  const total = salientesSource.reduce(
+    (acc, s) => acc + s.montoCentavos,
+    0
+  ) / 100;
+
+  salientesCount.innerText =
+    `Transferencias: ${salientesSource.length} — Total: ${normalizarMonto(total)}`;
 }
+
+/* FILTRO SALIENTES */
+function filtrarSalientes() {
+  let resultado = [...salientesSourceOriginal];
+
+  const buscado = limpiarMonto(salientesFilter.value);
+  if (buscado) {
+    const centavos = Number(buscado) * 100;
+    resultado = resultado.filter(s => s.montoCentavos === centavos);
+  }
+
+  if (salientesDesde.value) {
+    const desde = new Date(salientesDesde.value);
+    resultado = resultado.filter(s => s.fecha >= desde);
+  }
+
+  if (salientesHasta.value) {
+    const hasta = new Date(salientesHasta.value);
+    resultado = resultado.filter(s => s.fecha <= hasta);
+  }
+
+  salientesSource = resultado;
+  renderSalientes();
+}
+
+salientesFilter.addEventListener('input', filtrarSalientes);
+salientesDesde.addEventListener('change', filtrarSalientes);
+salientesHasta.addEventListener('change', filtrarSalientes);
