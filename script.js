@@ -80,83 +80,8 @@ function renderTransferenciasFuente() {
     `Transferencias visibles: ${transferenciasSource.length}`;
 }
 
-/**********************
- * TOTAL TRANSFERENCIAS RECIBIDAS
- **********************/
-function renderTotalTransferencias(lista = transferenciasSource) {
-  const total = lista.reduce(
-    (acc, t) => acc + t.montoCentavos,
-    0
-  ) / 100;
 
-  transferenciasTotal.innerText =
-    `Total: ${normalizarMonto(total)}`;
-}
 
-/**********************
- * FILTRO FECHA / HORA
- **********************/
-const fechaDesde = document.getElementById('fechaDesde');
-const fechaHasta = document.getElementById('fechaHasta');
-
-function filtrarTransferenciasPorFecha() {
-  let resultado = [...transferenciasSourceOriginal];
-
-  if (fechaDesde.value) {
-    const desde = new Date(fechaDesde.value);
-    resultado = resultado.filter(t => t.fecha >= desde);
-  }
-
-  if (fechaHasta.value) {
-    const hasta = new Date(fechaHasta.value);
-    resultado = resultado.filter(t => t.fecha <= hasta);
-  }
-
-  transferenciasSource = resultado;
-  renderTransferenciasFuente();
-  filtrarTransferenciasPorMonto();
-  renderTotalTransferencias();
-}
-
-fechaDesde.addEventListener('change', filtrarTransferenciasPorFecha);
-fechaHasta.addEventListener('change', filtrarTransferenciasPorFecha);
-
-/**********************
- * FILTRO MONTO
- **********************/
-function filtrarTransferenciasPorMonto() {
-  const buscado = limpiarMonto(transferenciasFilter.value);
-
-  if (!buscado) {
-    limpiarTransferenciasFiltradas();
-    renderTotalTransferencias();
-    return;
-  }
-
-  const centavos = Number(buscado) * 100;
-
-  const resultado = transferenciasSource.filter(
-    t => t.montoCentavos === centavos
-  );
-
-  transferenciasFiltradas.value =
-    resultado.map(t => t.raw).join('\n');
-
-  transferenciasCount.innerText =
-    `Transferencias filtradas: ${resultado.length}`;
-
-  renderTotalTransferencias(resultado);
-}
-
-transferenciasFilter.addEventListener('input', filtrarTransferenciasPorMonto);
-
-/**********************
- * LIMPIAR FILTRADAS
- **********************/
-function limpiarTransferenciasFiltradas() {
-  transferenciasFiltradas.value = '';
-  transferenciasCount.innerText = 'Transferencias filtradas: 0';
-}
 
 /**********************
  * RESTABLECER TRANSFERENCIAS
@@ -330,3 +255,4 @@ function filtrarSalientes() {
 salientesFilter.addEventListener('input', filtrarSalientes);
 salientesDesde.addEventListener('change', filtrarSalientes);
 salientesHasta.addEventListener('change', filtrarSalientes);
+
