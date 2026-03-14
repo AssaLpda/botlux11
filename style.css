@@ -1,48 +1,61 @@
-.panel {
-  background-color: #27272a;
-  padding: 1rem;
-  border-radius: 0.75rem;
+/* Configuración de Scrollbars */
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Personalización de Inputs de Fecha */
+input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.8) sepia(100%) saturate(500%) hue-rotate(240deg);
+    cursor: pointer;
 }
 
-.title {
-  font-weight: 600;
+/* Estilos Generales */
+body {
+    background-color: #0f172a; /* Slate oscuro con tinte azulado */
 }
 
-textarea {
-  width: 100%;
-  height: 13rem;
-  background-color: #18181b;
-  border-radius: 0.5rem;
-  padding: 0.75rem;
-  font-size: 0.85rem;
-  margin-bottom: 0.4rem;
+/* Glassmorphism para los paneles */
+.glass-panel {
+    background: rgba(30, 41, 59, 0.7);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-.filter {
-  width: 100%;
-  background-color: #18181b;
-  border-radius: 0.5rem;
-  padding: 0.4rem 0.6rem;
-  font-size: 0.75rem;
+/* Animación de botones */
+.btn-primary {
+    background: linear-gradient(135deg, #8b5cf6 0%, #3b82f6 100%);
+    box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3);
+    transition: all 0.2s ease;
 }
 
-.btn {
-  background-color: #059669;
-  padding: 0.5rem 1.5rem;
-  border-radius: 0.75rem;
-  font-weight: 600;
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(139, 92, 246, 0.4);
 }
 
-.btn:hover { background-color: #10b981; }
-
-.ok { color: #34d399; font-weight: 600; }
-.bonus { color: #facc15; font-weight: 600; }
-.error { color: #f87171; font-weight: 600; }
-
-.hint {
-  font-size: 0.75rem;
-  color: #a1a1aa;
+/* Contenedores de previsualización */
+.preview-box {
+    background-color: rgba(2, 6, 23, 0.5);
+    border: 1px solid rgba(51, 65, 85, 0.5);
 }
 
-ul { font-size: 0.85rem; }
+@keyframes shimmer {
+    100% {
+        transform: translateX(100%);
+    }
+}
 
+.btn-primary:active {
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.6);
+    filter: brightness(1.1);
+}
+
+/* Efecto de pulso cuando está procesando */
+.procesando {
+    animation: pulse-border 1.5s infinite;
+}
+
+@keyframes pulse-border {
+    0% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.7); }
+    70% { box-shadow: 0 0 0 15px rgba(139, 92, 246, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0); }
+}

@@ -1,258 +1,307 @@
-/**********************
- * VARIABLES FUENTE
- **********************/
-let cargasSource = '';
-let transferenciasSourceOriginal = [];
-let transferenciasSource = [];
+// Variables globales
+let datosCargasRaw = [];
+let datosExcelRaw = [];
+let datosBonificacionesRaw = [];
 
-let salientesSourceOriginal = [];
-let salientesSource = [];
+/**
+ * Base de datos de mapeo manual (Prioridad Máxima)
+ * Agregado Daiana Magali Pacheco para asegurar el caso actual.
+ */
+const diccionarioNombres = {
+    "a1magasalazar91": "Daiana Magali Pacheco",
+    "z3mailen14": "Mailen Angelica Ceballo",
+    "roxanatoledo2": "Nora Roxana Toledo"
+};
 
-/**********************
- * HELPERS
- **********************/
-function limpiarMonto(v) {
-  return v.replace(/[^\d]/g, '');
+/**
+ * Normaliza montos (ej: "7.800,84" -> 7800.84)
+ */
+function normalizarMonto(valor) {
+    if (!valor) return 0;
+    let str = valor.toString().trim();
+    str = str.replace(/\./g, '').replace(',', '.');
+    return parseFloat(str) || 0;
 }
 
-function normalizarMonto(num) {
-  const entero = Math.floor(Number(num));
-  return entero.toLocaleString('es-AR', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  });
+/**
+ * Limpia nombres para comparación inteligente (quita tildes, números y espacios)
+ */
+function simplificarParaComparar(str) {
+    if (!str) return "";
+    return str.toString()
+        .toLowerCase()
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "") 
+        .replace(/[0-9]/g, '') 
+        .replace(/\s+/g, '') 
+        .trim();
 }
 
-function extraerMontoLinea(linea) {
-  const m = linea.match(/-?\d{1,3}(?:\.\d{3})*,\d{2}/);
-  return m ? m[0] : null;
-}
-
-function montoLineaACentavos(linea) {
-  const m = extraerMontoLinea(linea);
-  if (!m) return null;
-  return Number(limpiarMonto(m));
-}
-
-/**********************
- * CARGAS MANUALES
- **********************/
-cargasInput.addEventListener('input', () => {
-  cargasSource = cargasInput.value;
-});
-
-/**********************
- * IMPORTAR TRANSFERENCIAS ENTRANTES
- **********************/
-xlsxInput.addEventListener('change', e => {
-  const reader = new FileReader();
-
-  reader.onload = evt => {
-    const wb = XLSX.read(evt.target.result, { type: 'binary' });
-    const sheet = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-
-    transferenciasSourceOriginal = rows
-      .filter(r => r[3] === 'Transferencia entrante' && Number(r[5]) > 0)
-      .map(r => ({
-        raw: `${r[0]}\tTransferencia\t${normalizarMonto(r[5])}`,
-        fecha: new Date(r[0]),
-        montoCentavos: Number(r[5]) * 100
-      }));
-
-    transferenciasSource = [...transferenciasSourceOriginal];
-    renderTransferenciasFuente();
-    limpiarTransferenciasFiltradas();
-    renderTotalTransferencias();
-  };
-
-  reader.readAsBinaryString(e.target.files[0]);
-});
-
-/**********************
- * RENDER FUENTE
- **********************/
-function renderTransferenciasFuente() {
-  transferenciasInput.value =
-    transferenciasSource.map(t => t.raw).join('\n');
-
-  transferenciasPreview.innerText =
-    `Transferencias visibles: ${transferenciasSource.length}`;
-}
-
-
-
-
-/**********************
- * RESTABLECER TRANSFERENCIAS
- **********************/
-resetTransferenciasBtn.addEventListener('click', () => {
-  transferenciasSource = [...transferenciasSourceOriginal];
-  fechaDesde.value = '';
-  fechaHasta.value = '';
-  transferenciasFilter.value = '';
-  renderTransferenciasFuente();
-  limpiarTransferenciasFiltradas();
-  renderTotalTransferencias();
-});
-
-/**********************
- * FILTRO CARGAS
- **********************/
-cargasFilter.addEventListener('input', () => {
-  if (!cargasFilter.value) {
-    cargasFiltradas.value = '';
-    cargasCount.innerText = 'Cargas filtradas: 0';
-    return;
-  }
-
-  const buscadoCentavos = Number(limpiarMonto(cargasFilter.value)) * 100;
-
-  const resultado = cargasSource
-    .split('\n')
-    .filter(l => montoLineaACentavos(l) === buscadoCentavos);
-
-  cargasFiltradas.value = resultado.join('\n');
-  cargasCount.innerText = `Cargas filtradas: ${resultado.length}`;
-});
-
-/**********************
- * COMPARAR
- **********************/
-compararBtn.addEventListener('click', () => {
-  okList.innerHTML = '';
-  bonusList.innerHTML = '';
-  errorList.innerHTML = '';
-
-  const cargas = cargasSource
-    .split('\n')
-    .map(l => {
-      const tipo = l.includes('Bonificacion') ? 'BONO' : 'CARGA';
-      const monto = extraerMontoLinea(l);
-      return monto ? { tipo, monto } : null;
-    })
-    .filter(Boolean);
-
-  const agrupadas = {};
-
-  cargas.forEach(c => {
-    if (!agrupadas[c.monto]) {
-      agrupadas[c.monto] = { carga: 0, bono: 0, trans: 0 };
+/**
+ * Procesa fechas de Excel/Texto
+ */
+function parsearFechaUniversal(fechaInput) {
+    if (fechaInput instanceof Date) return fechaInput;
+    let str = fechaInput.toString().trim().replace(',', '');
+    if (str.includes('/')) {
+        const partes = str.split(' ');
+        const fechaPartes = partes[0].split('/');
+        const dia = fechaPartes[0].padStart(2, '0');
+        const mes = fechaPartes[1].padStart(2, '0');
+        const anio = fechaPartes[2];
+        const hora = partes[1] || "00:00:00";
+        return new Date(`${anio}-${mes}-${dia}T${hora}`);
     }
-    if (c.tipo === 'BONO') agrupadas[c.monto].bono++;
-    else agrupadas[c.monto].carga++;
-  });
-
-  transferenciasSource.forEach(t => {
-    const m = extraerMontoLinea(t.raw);
-    if (!m) return;
-    if (!agrupadas[m]) {
-      agrupadas[m] = { carga: 0, bono: 0, trans: 0 };
-    }
-    agrupadas[m].trans++;
-  });
-
-  Object.entries(agrupadas).forEach(([monto, d]) => {
-    if (d.bono > 0) {
-      bonusList.innerHTML += `<li class="text-yellow-400">🎁 ${d.bono} bonificación(es) de ${monto}</li>`;
-    }
-
-    if (d.carga === d.trans) {
-      okList.innerHTML += `<li class="text-emerald-400">✔ ${d.carga} carga(s) OK de ${monto}</li>`;
-    } else if (d.carga > d.trans) {
-      errorList.innerHTML += `<li class="text-red-400">❌ Faltan ${d.carga - d.trans} transferencia(s) de ${monto}</li>`;
-    } else {
-      errorList.innerHTML += `<li class="text-red-400">⚠ Sobran ${d.trans - d.carga} transferencia(s) de ${monto}</li>`;
-    }
-  });
-});
-
-/**********************
- * TRANSFERENCIAS SALIENTES (SIN CAMBIOS)
- **********************/
-const CBU_EXCLUIDO = '000002334322884432';
-
-const salientesFilter = document.getElementById('salientesFilter');
-const salientesDesde = document.getElementById('salientesDesde');
-const salientesHasta = document.getElementById('salientesHasta');
-
-openSalientesBtn.addEventListener('click', () => {
-  salientesModal.classList.remove('hidden');
-  salientesModal.classList.add('flex');
-});
-
-closeSalientesBtn.addEventListener('click', () => {
-  salientesModal.classList.add('hidden');
-  salientesModal.classList.remove('flex');
-});
-
-/* IMPORTAR SALIENTES */
-xlsxSalientesInput.addEventListener('change', e => {
-  const reader = new FileReader();
-
-  reader.onload = evt => {
-    const wb = XLSX.read(evt.target.result, { type: 'binary' });
-    const sheet = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-
-    salientesSourceOriginal = rows
-      .filter(r =>
-        r[3] === 'Transferencia saliente' &&
-        Number(r[4]) > 0 &&
-        !String(r[2] || '').includes(CBU_EXCLUIDO)
-      )
-      .map(r => ({
-        raw: `${r[0]}\t${r[2]}\t${normalizarMonto(r[4])}`,
-        fecha: new Date(r[0]),
-        montoCentavos: Number(r[4]) * 100
-      }));
-
-    salientesSource = [...salientesSourceOriginal];
-    renderSalientes();
-  };
-
-  reader.readAsBinaryString(e.target.files[0]);
-});
-
-/* RENDER SALIENTES */
-function renderSalientes() {
-  salientesOutput.value =
-    salientesSource.map(s => s.raw).join('\n');
-
-  const total = salientesSource.reduce(
-    (acc, s) => acc + s.montoCentavos,
-    0
-  ) / 100;
-
-  salientesCount.innerText =
-    `Transferencias: ${salientesSource.length} — Total: ${normalizarMonto(total)}`;
+    return new Date(str);
 }
 
-/* FILTRO SALIENTES */
-function filtrarSalientes() {
-  let resultado = [...salientesSourceOriginal];
-
-  const buscado = limpiarMonto(salientesFilter.value);
-  if (buscado) {
-    const centavos = Number(buscado) * 100;
-    resultado = resultado.filter(s => s.montoCentavos === centavos);
-  }
-
-  if (salientesDesde.value) {
-    const desde = new Date(salientesDesde.value);
-    resultado = resultado.filter(s => s.fecha >= desde);
-  }
-
-  if (salientesHasta.value) {
-    const hasta = new Date(salientesHasta.value);
-    resultado = resultado.filter(s => s.fecha <= hasta);
-  }
-
-  salientesSource = resultado;
-  renderSalientes();
+// --- FUNCIONES DEL MODAL ---
+function cerrarModal() {
+    document.getElementById('modalIdentidad').classList.add('hidden');
 }
 
-salientesFilter.addEventListener('input', filtrarSalientes);
-salientesDesde.addEventListener('change', filtrarSalientes);
-salientesHasta.addEventListener('change', filtrarSalientes);
+window.onclick = function(event) {
+    const modal = document.getElementById('modalIdentidad');
+    if (event.target == modal) cerrarModal();
+}
 
+// --- 1. PROCESAR TEXTO (PANEL IZQUIERDO) ---
+document.getElementById('textoCargas').addEventListener('input', function(e) {
+    const lineas = e.target.value.split('\n');
+    datosCargasRaw = [];
+    datosBonificacionesRaw = [];
+
+    lineas.forEach(linea => {
+        if (linea.trim() === '' || linea.length < 18) return;
+        const fechaStr = linea.substring(0, 10);
+        const horaStr = linea.substring(10, 18);
+        const partes = linea.trim().split(/\s+/);
+        const monto = normalizarMonto(partes[partes.length - 1]);
+        const usuario = partes[1] || "Usuario";
+        const fechaObj = new Date(`${fechaStr}T${horaStr}`);
+
+        const item = { 
+            fechaObj, 
+            horaStr, 
+            usuario, 
+            monto, 
+            esBonif: linea.toUpperCase().includes("BONIFICACION") 
+        };
+        
+        if (item.esBonif) datosBonificacionesRaw.push(item);
+        else datosCargasRaw.push(item);
+    });
+    aplicarFiltros();
+});
+
+// --- 2. PROCESAR EXCEL (PANEL DERECHO) ---
+document.getElementById('inputExcel').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(event) {
+        const data = new Uint8Array(event.target.result);
+        const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const json = XLSX.utils.sheet_to_json(sheet);
+        datosExcelRaw = [];
+        json.forEach(fila => {
+            let keyMonto = Object.keys(fila).find(k => k.toLowerCase().includes('monto'));
+            let keyNombre = Object.keys(fila).find(k => k.toLowerCase().includes('nombre') || k.toLowerCase().includes('remitente'));
+            let keyFecha = Object.keys(fila).find(k => k.toLowerCase().includes('fecha'));
+            let monto = keyMonto ? normalizarMonto(fila[keyMonto]) : 0;
+            let nombre = fila[keyNombre] || "N/D";
+            let fechaRaw = fila[keyFecha];
+            if (!fechaRaw) return;
+            let fechaObj = parsearFechaUniversal(fechaRaw);
+            
+            // Filtro de empresa propia
+            if (nombre.toString().toUpperCase().trim().includes("GROWING")) return;
+            
+            if (monto > 0 && !isNaN(fechaObj.getTime())) {
+                datosExcelRaw.push({ monto, nombre, fechaObj });
+            }
+        });
+        aplicarFiltros();
+    };
+    reader.readAsArrayBuffer(file);
+});
+
+// --- 3. INVESTIGACIÓN POR FRAGMENTOS (SENSING) ---
+
+function buscarPosiblesCulpables(montoFila) {
+    const desdeVal = document.getElementById('turnoDesde').value;
+    const hastaVal = document.getElementById('turnoHasta').value;
+    const dD = desdeVal ? new Date(desdeVal).getTime() : null;
+    const dH = hastaVal ? new Date(hastaVal).getTime() : null;
+
+    const filtrarTurnoMonto = (lista) => lista.filter(i => {
+        const t = i.fechaObj.getTime();
+        const m = Math.floor(i.monto) === parseInt(montoFila);
+        return m && (!dD || t >= dD) && (!dH || t <= dH);
+    });
+
+    const cargasMonto = filtrarTurnoMonto(datosCargasRaw);
+    const excelMonto = filtrarTurnoMonto(datosExcelRaw);
+
+    const cuerpo = document.getElementById('modalCuerpo');
+    const subtitulo = document.getElementById('modalSubtitulo');
+
+    subtitulo.textContent = `Analizando $${parseInt(montoFila).toLocaleString('es-AR')}`;
+    cuerpo.innerHTML = ''; 
+
+    cargasMonto.forEach(c => {
+        const nickLimpio = simplificarParaComparar(c.usuario);
+        const horaCarga = `${c.fechaObj.getHours().toString().padStart(2, '0')}:${c.fechaObj.getMinutes().toString().padStart(2, '0')}`;
+
+        // Lógica de coincidencia por fragmentos
+        const candidatos = excelMonto.map(e => {
+            const nombreLimpio = simplificarParaComparar(e.nombre);
+            let score = 0;
+            let razon = "";
+
+            // 1. Diccionario manual
+            if (diccionarioNombres[c.usuario] === e.nombre) {
+                score = 4; razon = "MANUAL";
+            } 
+            // 2. Coincidencia directa de texto
+            else if (nickLimpio.length >= 4 && (nombreLimpio.includes(nickLimpio) || nickLimpio.includes(nombreLimpio))) {
+                score = 3; razon = "NOMBRE";
+            }
+            // 3. Fragmentación (pedazos de 4 letras) -> Para casos como "maga"
+            else {
+                for (let i = 0; i <= nickLimpio.length - 4; i++) {
+                    let fragmento = nickLimpio.substring(i, i + 4);
+                    if (nombreLimpio.includes(fragmento)) {
+                        score = 2; razon = "FRAGMENTO";
+                        break;
+                    }
+                }
+            }
+
+            // 4. Proximidad de tiempo (margen 20 min)
+            const diffMin = Math.abs(c.fechaObj - e.fechaObj) / 60000;
+            if (score === 0 && diffMin <= 20) {
+                score = 1; razon = "HORARIO";
+            }
+
+            return { ...e, score, razon, diffMin };
+        }).filter(cand => cand.score > 0).sort((a, b) => b.score - a.score);
+
+        let htmlCandidatos = '';
+        candidatos.forEach(cand => {
+            const hE = cand.fechaObj.getHours().toString().padStart(2, '0');
+            const mE = cand.fechaObj.getMinutes().toString().padStart(2, '0');
+            const color = cand.score >= 3 ? 'green' : (cand.score === 2 ? 'blue' : 'yellow');
+
+            htmlCandidatos += `
+                <div class="flex items-center gap-2 bg-${color}-500/5 border border-${color}-500/20 p-2 rounded-lg mb-1">
+                    <div class="flex-1">
+                        <p class="text-[11px] font-bold text-${color}-400 leading-tight">${cand.nombre}</p>
+                        <p class="text-[8px] text-slate-500 uppercase font-black">
+                            ${hE}:${mE} hs • <span class="opacity-70">${cand.razon}</span> 
+                            ${cand.score === 1 ? `(${Math.round(cand.diffMin)}m dif)` : ''}
+                        </p>
+                    </div>
+                </div>`;
+        });
+
+        cuerpo.innerHTML += `
+            <div class="bg-slate-900/50 p-3 rounded-xl border border-slate-800 mb-3">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-[12px] font-black text-white uppercase">${c.usuario}</span>
+                    <span class="text-[9px] font-mono text-slate-500 bg-slate-950 px-1 py-0.5 rounded">Carga: ${horaCarga}</span>
+                </div>
+                ${htmlCandidatos || '<p class="text-[9px] text-slate-600 italic p-2">Sin coincidencias.</p>'}
+            </div>`;
+    });
+
+    document.getElementById('modalIdentidad').classList.remove('hidden');
+}
+
+// --- 4. FILTROS Y RENDERIZADO ---
+function aplicarFiltros() {
+    const fMontoInput = document.getElementById('filtroMonto').value.trim();
+    const fNombre = simplificarParaComparar(document.getElementById('filtroNombre').value);
+    const desdeVal = document.getElementById('turnoDesde').value;
+    const hastaVal = document.getElementById('turnoHasta').value;
+    const dD = desdeVal ? new Date(desdeVal).getTime() : null;
+    const dH = hastaVal ? new Date(hastaVal).getTime() : null;
+    const fMontoNum = fMontoInput !== "" ? Math.floor(normalizarMonto(fMontoInput)) : null;
+
+    const filtrar = (lista, campo) => lista.filter(i => {
+        const mMatch = fMontoNum === null || Math.floor(i.monto) === fMontoNum;
+        const nMatch = fNombre === "" || simplificarParaComparar(i[campo]).includes(fNombre);
+        const tMatch = (!dD || i.fechaObj.getTime() >= dD) && (!dH || i.fechaObj.getTime() <= dH);
+        return mMatch && nMatch && tMatch;
+    });
+
+    renderizarCargas(filtrar(datosCargasRaw, 'usuario'), filtrar(datosBonificacionesRaw, 'usuario'));
+    renderizarExcel(filtrar(datosExcelRaw, 'nombre'));
+}
+
+function renderizarCargas(c, b) {
+    const vis = document.getElementById('resultadoCargas');
+    vis.innerHTML = '';
+    b.forEach(item => vis.innerHTML += `<div class="text-yellow-500 italic border-b border-zinc-800 py-1 flex justify-between text-[10px]"><span>🎁 ${item.usuario}</span><span class="font-bold">$${item.monto.toLocaleString('es-AR')}</span></div>`);
+    c.forEach(item => {
+        const h = item.fechaObj.getHours().toString().padStart(2, '0');
+        const m = item.fechaObj.getMinutes().toString().padStart(2, '0');
+        vis.innerHTML += `<div class="border-b border-zinc-800 py-1 flex justify-between text-[10px]"><span><span class="text-zinc-500">${h}:${m}</span> | ${item.usuario}</span><span class="text-green-400 font-bold">$${item.monto.toLocaleString('es-AR')}</span></div>`;
+    });
+}
+
+function renderizarExcel(e) {
+    const vis = document.getElementById('resultadoExcel');
+    vis.innerHTML = '';
+    e.forEach(item => {
+        const h = item.fechaObj.getHours().toString().padStart(2, '0');
+        const m = item.fechaObj.getMinutes().toString().padStart(2, '0');
+        vis.innerHTML += `<div class="border-b border-zinc-800 py-1 flex justify-between text-[10px]"><span><span class="text-zinc-500">${h}:${m}</span> | <span class="truncate w-32 inline-block align-bottom">${item.nombre}</span></span><span class="text-blue-400 font-bold">$${item.monto.toLocaleString('es-AR')}</span></div>`;
+    });
+}
+
+function conciliar() {
+    const desdeVal = document.getElementById('turnoDesde').value;
+    const hastaVal = document.getElementById('turnoHasta').value;
+    const dD = desdeVal ? new Date(desdeVal).getTime() : null;
+    const dH = hastaVal ? new Date(hastaVal).getTime() : null;
+    const filtrar = (l) => l.filter(i => (!dD || i.fechaObj.getTime() >= dD) && (!dH || i.fechaObj.getTime() <= dH));
+
+    const cT = filtrar(datosCargasRaw);
+    const eT = filtrar(datosExcelRaw);
+    const cuerpo = document.getElementById('tablaComparativa');
+    cuerpo.innerHTML = '';
+
+    const countC = {}; const countE = {};
+    cT.forEach(i => { let m = Math.floor(i.monto); countC[m] = (countC[m] || 0) + 1; });
+    eT.forEach(i => { let m = Math.floor(i.monto); countE[m] = (countE[m] || 0) + 1; });
+
+    const montos = [...new Set([...Object.keys(countC), ...Object.keys(countE)])].sort((a, b) => b - a);
+
+    montos.forEach(m => {
+        const c = countC[m] || 0; const e = countE[m] || 0; const ok = c === e;
+        const tr = document.createElement('tr');
+        tr.className = `cursor-pointer transition-all ${ok ? "bg-green-500/5 hover:bg-green-500/10" : "bg-red-500/5 hover:bg-red-500/10"}`;
+        tr.onclick = () => buscarPosiblesCulpables(m);
+        tr.innerHTML = `<td class="p-3 border-b border-slate-800 font-mono text-violet-400 font-bold text-[13px]">$ ${parseInt(m).toLocaleString('es-AR')}</td>
+            <td class="p-3 border-b border-slate-800 text-center font-bold text-slate-300">${c}</td>
+            <td class="p-3 border-b border-slate-800 text-center font-bold text-slate-300">${e}</td>
+            <td class="p-3 border-b border-slate-800 text-center font-black text-[9px] uppercase">${ok ? '<span class="text-green-500">✅ OK</span>' : (c > e ? '<span class="text-red-500">❌ FALTA</span>' : '<span class="text-blue-400">⚠️ SOBRA</span>')}</td>`;
+        cuerpo.appendChild(tr);
+    });
+}
+
+function ejecutarConciliacion() {
+    const btn = document.getElementById('btnConciliar');
+    const cargando = document.getElementById('btnCargando');
+    btn.disabled = true; cargando.classList.remove('hidden');
+    setTimeout(() => { conciliar(); btn.disabled = false; cargando.classList.add('hidden'); }, 600);
+}
+
+function limpiarFiltros() {
+    document.getElementById('filtroMonto').value = "";
+    document.getElementById('filtroNombre').value = "";
+    document.getElementById('turnoDesde').value = "";
+    document.getElementById('turnoHasta').value = "";
+    aplicarFiltros();
+}
