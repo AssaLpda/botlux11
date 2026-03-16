@@ -22,7 +22,7 @@ body {
 
 /* Animación de botones */
 .btn-primary {
-    background: linear-gradient(135deg, #8b5cf6 0%, #3b82f6 100%);
+    background: linear-gradient(135deg, #8b5cf6 0%, #5af63b 100%);
     box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3);
     transition: all 0.2s ease;
 }

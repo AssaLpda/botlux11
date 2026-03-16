@@ -99,27 +99,43 @@
 </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            <div class="space-y-2">
-                <label class="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] ml-2">1. Pegar registros de texto</label>
-                <textarea id="textoCargas" 
-                    class="w-full h-32 p-4 bg-slate-800/80 border border-slate-700 rounded-xl focus:ring-2 focus:ring-violet-500/30 outline-none text-xs font-mono scrollbar-hide"
-                    placeholder="Pegue aquí el texto de las cargas..."></textarea>
-                <div id="resultadoCargas" class="h-48 overflow-y-auto preview-box rounded-xl p-4 text-[18px] font-mono shadow-inner space-y-2 scrollbar-hide">
-                    <span class="text-slate-700 italic text-[9px]">Esperando datos de texto...</span>
-                </div>
-            </div>
-
-            <div class="space-y-2">
-                <label class="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] ml-2">2. Importar reporte Excel</label>
-                <div class="bg-slate-800/80 border border-slate-700 rounded-xl p-3 px-4">
-                    <input type="file" id="inputExcel" accept=".xlsx" 
-                        class="block w-full text-xs text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:bg-slate-700 file:text-slate-400 hover:file:bg-violet-600 file:transition-colors cursor-pointer font-bold">
-                </div>
-                <div id="resultadoExcel" class="h-60 overflow-y-auto preview-box rounded-xl p-4 text-[11px] font-mono mt-2 shadow-inner space-y-2 scrollbar-hide">
-                    <span class="text-slate-700 italic text-[9px]">Esperando archivo Excel...</span>
-                </div>
+    <div class="space-y-2">
+        <div class="flex justify-between items-end ml-2">
+            <label class="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">1. Registros de Texto</label>
+            <div class="relative">
+                <span class="absolute left-2 top-1/2 -translate-y-1/2 text-violet-500/50 text-[10px] font-mono">$</span>
+                <input type="text" id="filtroInternoCargas" oninput="aplicarFiltros()" 
+                    class="bg-slate-900/80 border border-slate-700 rounded-lg py-1 pl-5 pr-2 text-[10px] w-24 focus:border-violet-500 outline-none text-violet-400 placeholder-slate-700 transition-all" 
+                    placeholder="Filtrar...">
             </div>
         </div>
+        <textarea id="textoCargas" 
+            class="w-full h-32 p-4 bg-slate-800/80 border border-slate-700 rounded-xl focus:ring-2 focus:ring-violet-500/30 outline-none text-xs font-mono scrollbar-hide"
+            placeholder="Pegue aquí el texto de las cargas..."></textarea>
+        <div id="resultadoCargas" class="h-48 overflow-y-auto preview-box rounded-xl p-4 text-[18px] font-mono shadow-inner space-y-2 scrollbar-hide">
+            <span class="text-slate-700 italic text-[9px]">Esperando datos de texto...</span>
+        </div>
+    </div>
+
+    <div class="space-y-2">
+        <div class="flex justify-between items-end ml-2">
+            <label class="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">2. Reporte Excel</label>
+            <div class="relative">
+                <span class="absolute left-2 top-1/2 -translate-y-1/2 text-cyan-500/50 text-[10px] font-mono">$</span>
+                <input type="text" id="filtroInternoExcel" oninput="aplicarFiltros()" 
+                    class="bg-slate-900/80 border border-slate-700 rounded-lg py-1 pl-5 pr-2 text-[10px] w-24 focus:border-cyan-500 outline-none text-cyan-400 placeholder-slate-700 transition-all" 
+                    placeholder="Filtrar...">
+            </div>
+        </div>
+        <div class="bg-slate-800/80 border border-slate-700 rounded-xl p-3 px-4">
+            <input type="file" id="inputExcel" accept=".xlsx" 
+                class="block w-full text-xs text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:bg-slate-700 file:text-slate-400 hover:file:bg-violet-600 file:transition-colors cursor-pointer font-bold">
+        </div>
+        <div id="resultadoExcel" class="h-60 overflow-y-auto preview-box rounded-xl p-4 text-[11px] font-mono mt-2 shadow-inner space-y-2 scrollbar-hide">
+            <span class="text-slate-700 italic text-[9px]">Esperando archivo Excel...</span>
+        </div>
+    </div>
+</div>
 
        <div class="flex justify-center mb-10">
     <button id="btnConciliar" onclick="ejecutarConciliacion()" 
@@ -138,24 +154,29 @@
     </button>
 </div>
         <div class="glass-panel rounded-2xl shadow-2xl overflow-hidden mb-8 border border-slate-700/50">
-            <div class="bg-slate-900/80 p-4 border-b border-slate-700 flex justify-between items-center">
-                <h2 class="text-xs font-black text-violet-400 uppercase tracking-widest">📊 Balance de Diferencias</h2>
-                <span class="text-[9px] text-slate-500 font-bold uppercase">Agrupado por Monto</span>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse">
-                    <thead>
-                        <tr class="bg-slate-900/30 text-[9px] uppercase text-slate-500 tracking-widest">
-                            <th class="p-5 border-b border-slate-700">Importe</th>
-                            <th class="p-5 border-b border-slate-700 text-center">Cant. Cargas</th>
-                            <th class="p-5 border-b border-slate-700 text-center">Cant. Excel</th>
-                            <th class="p-5 border-b border-slate-700 text-right pr-10">Estado</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tablaComparativa" class="divide-y divide-slate-700/30">
-                        </tbody>
-                </table>
-            </div>
+    <div class="bg-slate-900/80 p-3 border-b border-slate-700 flex justify-between items-center">
+        <h2 class="text-[10px] font-black text-violet-400 uppercase tracking-widest flex items-center gap-2">
+            <span class="w-1.5 h-1.5 bg-violet-500 rounded-full animate-pulse"></span>
+            Balance de Diferencias
+        </h2>
+        <span class="text-[8px] text-slate-500 font-bold uppercase bg-black/40 px-2 py-0.5 rounded-md">Agrupado por Monto</span>
+    </div>
+
+    <div class="overflow-y-auto max-h-[450px] custom-scrollbar">
+        <table class="w-full text-left border-collapse table-fixed">
+            <thead class="sticky top-0 z-10 bg-slate-900 shadow-md">
+                <tr class="text-[8px] uppercase text-slate-500 tracking-widest">
+                    <th class="p-3 border-b border-slate-700 w-1/4">Importe</th>
+                    <th class="p-3 border-b border-slate-700 text-center w-1/4">Cargas</th>
+                    <th class="p-3 border-b border-slate-700 text-center w-1/4">Excel</th>
+                    <th class="p-3 border-b border-slate-700 text-right pr-6 w-1/4">Estado</th>
+                </tr>
+            </thead>
+            <tbody id="tablaComparativa" class="divide-y divide-slate-700/30">
+                </tbody>
+        </table>
+    </div>
+</div>
         </div>
 
         <div class="glass-panel p-6 rounded-2xl shadow border-l-8 border-amber-500 mb-12">
